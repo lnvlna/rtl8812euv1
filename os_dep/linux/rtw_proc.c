@@ -6322,15 +6322,17 @@ static ssize_t proc_set_mgnt_inject(
     void *data
 )
 {
-	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-    ResumeTxBeacon(padapter);
-    rtw_mi_tx_beacon_hdl(padapter);
+
+    
     // Здесь будет наш код
     char tmp[128]; // для приёма строки из user-space
     struct net_device *ndev = data;
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
+	ResumeTxBeacon(padapter);
+    rtw_mi_tx_beacon_hdl(padapter);
+    tx_beacon_hdl(padapter, NULL);
+	pr_info("Фрейм успешно отправлен!\n");
     // простой пример статического mgmt-фрейма (чисто демонстрация)
     // В реальности вы, конечно, сформируете нужный вам содержимый буфер
     static const u8 test_mgmt[] = {
