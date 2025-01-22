@@ -6349,7 +6349,7 @@ pr_info("четр (resss=%d)\n", resss);
 
 /* disable Port0 TSF update*/
 	rtw_write8(adapter, REG_BCN_CTRL, rtw_read8(adapter, REG_BCN_CTRL) | DIS_TSF_UDT);
-	ResumeTxBeacon(Adapter);
+	ResumeTxBeacon(adapter);
 
 	rtw_write8(adapter, REG_BCN_CTRL, DIS_TSF_UDT | DIS_BCNQ_SUB);
 
