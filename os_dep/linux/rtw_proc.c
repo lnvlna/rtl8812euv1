@@ -6338,11 +6338,11 @@ static ssize_t proc_set_mgnt_inject(
 rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2,
     rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
 
-	rtw_write8(padapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
+	rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
 	
-	rtw_write8(padapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
-rtw_write8(padapter, REG_TBTT_PROHIBIT + 2,
-    (rtw_read8(padapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
+	rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
+rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
+    (rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
 	
 
 enum _hw_port hwport = HW_PORT0;  // Или другой порт, если требуется
