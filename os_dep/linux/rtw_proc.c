@@ -18,7 +18,8 @@
 #include <hal_data.h>
 #include "rtw_proc.h"
 #include <rtw_btcoex.h>
-#include <hal/hal_halmac.h>
+#include "../../hal/hal_halmac.h"
+
 
 #ifdef CONFIG_PROC_DEBUG
 
