@@ -6342,8 +6342,16 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
 	ret = rtw_halmac_get_bcn_ctrl(adapter_to_dvobj(adapter), hwport, &bcn_ctrl);
     if (ret == 0) {
         pr_info("Beacon control считан успешно!\n");
-        // Здесь вы можете обработать поля структуры bcn_ctrl
-        // например: pr_info("enable_bcn: %d\n", bcn_ctrl.enable_bcn);
+
+    pr_info("Beacon control считан успешно!\n");
+    pr_info("  rx_bssid_fit  = %d\n", bcn_ctrl.rx_bssid_fit);
+    pr_info("  txbcn_rpt     = %d\n", bcn_ctrl.txbcn_rpt);
+    pr_info("  tsf_update    = %d\n", bcn_ctrl.tsf_update);
+    pr_info("  enable_bcn    = %d\n", bcn_ctrl.enable_bcn);
+    pr_info("  rxbcn_rpt     = %d\n", bcn_ctrl.rxbcn_rpt);
+    pr_info("  p2p_ctwin     = %d\n", bcn_ctrl.p2p_ctwin);
+    pr_info("  p2p_bcn_area  = %d\n", bcn_ctrl.p2p_bcn_area);
+
     } else {
         pr_info("Не удалось считать beacon control (ret=%d)\n", ret);
     }
