@@ -6314,6 +6314,89 @@ static ssize_t proc_set_bf_monitor_en(struct file *file, const char __user *buff
 }
 #endif
 
+static ssize_t proc_set_mgnt_inject(
+    struct file *file,
+    const char __user *buffer,
+    size_t count,
+    loff_t *pos,
+    void *data
+)
+{
+    // Здесь будет наш код
+    char tmp[128]; // для приёма строки из user-space
+    struct net_device *ndev = data;
+    _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
+
+    // простой пример статического mgmt-фрейма (чисто демонстрация)
+    // В реальности вы, конечно, сформируете нужный вам содержимый буфер
+    static const u8 test_mgmt[] = {
+        0x40, 0x00, // frame control: probe request
+        0x00, 0x00, // duration
+        0xff,0xff,0xff,0xff,0xff,0xff, // DA = broadcast
+        0x11,0x22,0x33,0x44,0x55,0x66, // SA = ваша MAC
+        0xff,0xff,0xff,0xff,0xff,0xff, // BSSID = broadcast
+        0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+        // дальше можно SSID IE, etc., но пусть будет пусто
+    };
+
+    // Для простоты будем парсить (канал, wait_ack) из пользовательских данных (необязательно)
+    // а фрейм использовать статически
+    int tx_ch = 6;
+    int wait_ack = 1; // 1=TRUE, 0=FALSE
+    int no_cck = 0;
+    int flags = 0;
+
+    // При желании читаем что прислали user-space
+    // Можем парсить строку - хотя бы канал (tx_ch)
+    if (count > sizeof(tmp))
+        return -EFAULT;
+    if (buffer && count) {
+        if (copy_from_user(tmp, buffer, count))
+            return -EFAULT;
+        tmp[count] = '\0';
+
+        // Простейший пример: "echo 13 0 > mgnt_inject" -> tx_ch=13 wait_ack=0
+        // Если не надо – можно не парсить
+        sscanf(tmp, "%d %d", &tx_ch, &wait_ack);
+    }
+
+    // Вызываем rtw_mgnt_tx_cmd
+    RTW_INFO("%s: try mgnt_tx_cmd -> channel=%d, wait_ack=%d\n",
+             __func__, tx_ch, wait_ack);
+
+    {
+        // rtw_mgnt_tx_cmd(
+        //    _adapter *adapter,
+        //    u8 tx_ch,
+        //    u8 no_cck,
+        //    const u8 *buf,
+        //    size_t len,
+        //    int wait_ack,
+        //    u8 flags
+        // );
+        u8 tx_ret = rtw_mgnt_tx_cmd(adapter,
+                                    (u8)tx_ch,
+                                    (u8)no_cck,
+                                    test_mgmt,
+                                    sizeof(test_mgmt),
+                                    0,
+                                    (u8)flags);
+
+        if (tx_ret == _SUCCESS)
+            RTW_INFO("%s: mgnt_tx_cmd => _SUCCESS\n", __func__);
+        else
+            RTW_INFO("%s: mgnt_tx_cmd => _FAIL\n", __func__);
+    }
+
+    return count;
+}
+
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
@@ -6322,6 +6405,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("thermal_state", proc_get_thermal_state, proc_set_thermal_state),
         RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
+		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
@@ -7406,5 +7490,7 @@ void rtw_adapter_proc_replace(struct net_device *dev)
 	rtw_adapter_proc_init(dev);
 
 }
+
+
 
 #endif /* CONFIG_PROC_DEBUG */
