@@ -6316,6 +6316,10 @@ static ssize_t proc_set_bf_monitor_en(struct file *file, const char __user *buff
 }
 #endif
 
+/* временный вариант, не лучший, но быстро уберёт ошибку */
+extern void InitBeaconParameters(_adapter *adapter);
+extern void beacon_function_enable(_adapter *adapter, u8 enable, u8 linked);
+
 static ssize_t proc_set_mgnt_inject(
     struct file *file,
     const char __user *buffer,
