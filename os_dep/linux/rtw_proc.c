@@ -6329,9 +6329,9 @@ static ssize_t proc_set_mgnt_inject(
     struct net_device *ndev = data;
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
-	ResumeTxBeacon(padapter);
-    rtw_mi_tx_beacon_hdl(padapter);
-    tx_beacon_hdl(padapter, NULL);
+	ResumeTxBeacon(adapter);
+    rtw_mi_tx_beacon_hdl(adapter);
+    tx_beacon_hdl(adapter, NULL);
 	pr_info("Фрейм успешно отправлен!\n");
     // простой пример статического mgmt-фрейма (чисто демонстрация)
     // В реальности вы, конечно, сформируете нужный вам содержимый буфер
