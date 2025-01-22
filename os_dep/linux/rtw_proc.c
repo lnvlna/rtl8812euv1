@@ -6332,6 +6332,22 @@ static ssize_t proc_set_mgnt_inject(
 	ResumeTxBeacon(adapter);
     rtw_mi_tx_beacon_hdl(adapter);
     tx_beacon_hdl(adapter, NULL);
+
+
+	
+enum _hw_port hwport = HW_PORT0;  // Или другой порт, если требуется
+    struct rtw_halmac_bcn_ctrl bcn_ctrl;
+    int ret;
+
+	ret = rtw_halmac_get_bcn_ctrl(adapter_to_dvobj(adapter), hwport, &bcn_ctrl);
+    if (ret == 0) {
+        pr_info("Beacon control считан успешно!\n");
+        // Здесь вы можете обработать поля структуры bcn_ctrl
+        // например: pr_info("enable_bcn: %d\n", bcn_ctrl.enable_bcn);
+    } else {
+        pr_info("Не удалось считать beacon control (ret=%d)\n", ret);
+    }
+	
 	pr_info("Фрейм успешно отправлен!\n");
     // простой пример статического mgmt-фрейма (чисто демонстрация)
     // В реальности вы, конечно, сформируете нужный вам содержимый буфер
