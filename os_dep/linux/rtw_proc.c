@@ -6334,6 +6334,9 @@ static ssize_t proc_set_mgnt_inject(
 	ResumeTxBeacon(adapter);
     rtw_mi_tx_beacon_hdl(adapter);
     tx_beacon_hdl(adapter, NULL);
+	
+rtw_write8(padapter, REG_FWHW_TXQ_CTRL + 2,
+    rtw_read8(padapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
 
 enum _hw_port hwport = HW_PORT0;  // Или другой порт, если требуется
     struct rtw_halmac_bcn_ctrl bcn_ctrl;
