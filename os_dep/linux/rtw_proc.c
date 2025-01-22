@@ -6335,16 +6335,6 @@ static ssize_t proc_set_mgnt_inject(
     rtw_mi_tx_beacon_hdl(adapter);
     tx_beacon_hdl(adapter, NULL);
 
-struct rtw_halmac_bcn_ctrl {
-	u8 rx_bssid_fit:1;	/* 0:HW handle beacon, 1:ignore */
-	u8 txbcn_rpt:1;		/* Enable TXBCN report in ad hoc and AP mode */
-	u8 tsf_update:1;	/* Update TSF when beacon or probe response */
-	u8 enable_bcn:1;	/* Enable beacon related functions */
-	u8 rxbcn_rpt:1;		/* Enable RXBCNOK report */
-	u8 p2p_ctwin:1;		/* Enable P2P CTN WINDOWS function */
-	u8 p2p_bcn_area:1;	/* Enable P2P BCN area on function */
-};
-	
 enum _hw_port hwport = HW_PORT0;  // Или другой порт, если требуется
     struct rtw_halmac_bcn_ctrl bcn_ctrl;
     int ret;
