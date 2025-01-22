@@ -20,7 +20,7 @@
  */
 #define AUTOCONF_INCLUDED
 #define RTL871X_MODULE_NAME "88x2EU"
-#define DRV_NAME "rtl88x2eu"
+#define DRV_NAME "rtl88x2eu_v1"
 
 /* Set CONFIG_RTL8822E from Makefile */
 #ifndef CONFIG_RTL8822E
