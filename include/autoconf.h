@@ -143,6 +143,8 @@
 	#endif
 	#define CONFIG_FIND_BEST_CHANNEL	1
 #endif
+#define CONFIG_INTERRUPT_BASED_TXBCN
+#define CONFIG_INTERRUPT_BASED_TXBCN_BCN_OK_ERR
 
 #ifdef CONFIG_P2P
 	/* The CONFIG_WFD is for supporting the Wi-Fi display */
