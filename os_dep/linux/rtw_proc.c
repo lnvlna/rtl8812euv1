@@ -6322,7 +6322,7 @@ static ssize_t proc_set_mgnt_inject(
     void *data
 )
 {
-    ResumeTxBeacon(adapter);
+    //ResumeTxBeacon(adapter);
 	rtw_mi_tx_beacon_hdl(adapter);
     // Здесь будет наш код
     char tmp[128]; // для приёма строки из user-space
