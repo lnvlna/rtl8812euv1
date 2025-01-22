@@ -1240,19 +1240,19 @@ u8 rtw_mi_buddy_sreset_adapter_hdl(_adapter *padapter, u8 bstart)
 	return _rtw_mi_process(padapter, _TRUE, &in_data, _rtw_mi_sreset_adapter_hdl);
 }
 
-#ifdef CONFIG_AP_MODE
+/*#ifdef CONFIG_AP_MODE*/
 static u8 _rtw_mi_tx_beacon_hdl(_adapter *adapter, void *data)
 {
-	if ((MLME_IS_AP(adapter) || MLME_IS_MESH(adapter))
-		&& check_fwstate(&adapter->mlmepriv, WIFI_ASOC_STATE) == _TRUE
-	) {
+	//if ((MLME_IS_AP(adapter) || MLME_IS_MESH(adapter))
+		//&& check_fwstate(&adapter->mlmepriv, WIFI_ASOC_STATE) == _TRUE
+	//) {
 		adapter->mlmepriv.update_bcn = _TRUE;
-#ifndef CONFIG_INTERRUPT_BASED_TXBCN
+//#ifndef CONFIG_INTERRUPT_BASED_TXBCN
 #if defined(CONFIG_USB_HCI) || defined(CONFIG_SDIO_HCI) || defined(CONFIG_GSPI_HCI) || defined(CONFIG_PCI_BCN_POLLING)
 		tx_beacon_hdl(adapter, NULL);
 #endif
-#endif
-	}
+//#endif
+	//}
 	return _TRUE;
 }
 u8 rtw_mi_tx_beacon_hdl(_adapter *padapter)
@@ -1268,10 +1268,10 @@ static u8 _rtw_mi_set_tx_beacon_cmd(_adapter *adapter, void *data)
 {
 	struct mlme_priv *pmlmepriv = &adapter->mlmepriv;
 
-	if (MLME_IS_AP(adapter) || MLME_IS_MESH(adapter)) {
+	//if (MLME_IS_AP(adapter) || MLME_IS_MESH(adapter)) {
 		if (pmlmepriv->update_bcn == _TRUE)
 			set_tx_beacon_cmd(adapter, 0);
-	}
+	//}
 	return _TRUE;
 }
 u8 rtw_mi_set_tx_beacon_cmd(_adapter *padapter)
@@ -1282,7 +1282,7 @@ u8 rtw_mi_buddy_set_tx_beacon_cmd(_adapter *padapter)
 {
 	return _rtw_mi_process(padapter, _TRUE, NULL, _rtw_mi_set_tx_beacon_cmd);
 }
-#endif /* CONFIG_AP_MODE */
+/*#endif /* CONFIG_AP_MODE */
 
 #ifdef CONFIG_P2P
 static u8 _rtw_mi_p2p_chk_state(_adapter *adapter, void *data)
