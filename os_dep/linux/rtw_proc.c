@@ -6337,17 +6337,14 @@ static ssize_t proc_set_mgnt_inject(
 
 int resss;
 	
-resss = rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2,
-	pr_info("перв (resss=%d)\n", resss),
-    resss = rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
-pr_info("второй (resss=%d)\n", resss);
-	resss = rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
-	pr_info("трет (resss=%d)\n", resss);
-	resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
-	pr_info("чет (resss=%d)\n", resss);
-resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
-    (rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
-	pr_info("пять (resss=%d)\n", resss);
+resss = rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2, rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
+pr_info("перв (resss=%d)\n", resss);
+resss = rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
+pr_info("два (resss=%d)\n", resss);
+resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
+pr_info("три (resss=%d)\n", resss);
+resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 2, (rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
+pr_info("четр (resss=%d)\n", resss);
 
 enum _hw_port hwport = HW_PORT0;  // Или другой порт, если требуется
     struct rtw_halmac_bcn_ctrl bcn_ctrl;
