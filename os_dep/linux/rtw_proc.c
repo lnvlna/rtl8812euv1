@@ -6383,6 +6383,8 @@ static ssize_t proc_set_mgnt_inject(
 	//beacon_function_enable(adapter, _TRUE, _TRUE);
 	//ResumeTxBeacon(adapter);
 	//set_beacon_related_registers(adapter);
+
+	
 enum _hw_port hwport = HW_PORT0;  // Или другой порт, если требуется
     struct rtw_halmac_bcn_ctrl bcn_ctrl;
     int ret;
@@ -6405,6 +6407,18 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
     }
 	
 	pr_info("Фрейм успешно отправлен!\n");
+
+	/* read TSF */
+	timestamp[1] = rtw_read32(padapter, 0x560 + 4);
+	timestamp[0] = rtw_read32(padapter, 0x560);
+	while (timestamp[1]) {
+		time = (0xFFFFFFFF % bcn_interval_us + 1) * timestamp[1] + timestamp[0];
+		timestamp[0] = (u32)time;
+		timestamp[1] = (u32)(time >> 32);
+	}
+	cur_tick = timestamp[0] % bcn_interval_us;
+	pr_info("tsf cur_tick (cur_tick=%d)\n", cur_tick);
+	
     // простой пример статического mgmt-фрейма (чисто демонстрация)
     // В реальности вы, конечно, сформируете нужный вам содержимый буфер
     static const u8 test_mgmt[] = {
