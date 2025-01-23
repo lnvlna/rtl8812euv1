@@ -87,6 +87,7 @@ u8 rtw_set_tim_ie(u8 dtim_cnt, u8 dtim_period
 
 static void update_BCNTIM(_adapter *padapter)
 {
+	pr_info("update_BCNTIM\n");
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	struct mlme_ext_priv *pmlmeext = &(padapter->mlmeextpriv);
 	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
