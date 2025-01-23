@@ -20,8 +20,8 @@
 #include <rtw_btcoex.h>
 #include "../../hal/hal_halmac.h"
 /* временный вариант, не лучший, но быстро уберёт ошибку */
-extern void InitBeaconParameters(_adapter *adapter);
-extern void beacon_function_enable(_adapter *adapter, u8 enable, u8 linked);
+//extern void InitBeaconParameters(_adapter *adapter);
+//extern void beacon_function_enable(_adapter *adapter, u8 enable, u8 linked);
 
 #ifdef CONFIG_PROC_DEBUG
 
