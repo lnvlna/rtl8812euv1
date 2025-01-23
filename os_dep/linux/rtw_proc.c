@@ -6359,8 +6359,8 @@ static ssize_t proc_set_mgnt_inject(
 	rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E + 2,
 		(rtw_read8(adapter, REG_TBTT_PROHIBIT_8822E + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME_STOP_BCN >> 8));
 
-	rtw_write8(adapter, REG_DRVERLYINT_8822E, DRIVER_EARLY_INT_TIME_8822E); /* 5ms */
-	rtw_write8(adapter, REG_BCNDMATIM_8822E, BCN_DMA_ATIME_INT_TIME_8822E); /* 2ms */
+	rtw_write8(adapter, REG_DRVERLYINT_8822E, 0x05); /* 5ms */
+	rtw_write8(adapter, REG_BCNDMATIM_8822E, 0x02); /* 2ms */
 
 	/*
 	 * Suggested by designer timchen. Change beacon AIFS to the largest number
@@ -6373,7 +6373,7 @@ static ssize_t proc_set_mgnt_inject(
 
 	rtw_write8(adapter, REG_RXTSF_OFFSET_CCK_8822E, 0x50);
 	rtw_write8(adapter, REG_RXTSF_OFFSET_OFDM_8822E, 0x50);
-	u8 val8;
+	//u8 val8;
 	u32 bcn_ctrl_reg;
 
 	/* port0 */
