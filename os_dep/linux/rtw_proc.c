@@ -6341,16 +6341,16 @@ static ssize_t proc_set_mgnt_inject(
     rtw_mi_tx_beacon_hdl(adapter);
     tx_beacon_hdl(adapter, NULL);
 
-int resss;
+//int resss;
 	
-resss = rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2, rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
-pr_info("перв (resss=%d)\n", resss);
-resss = rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
-pr_info("два (resss=%d)\n", resss);
-resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
-pr_info("три (resss=%d)\n", resss);
-resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 2, (rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
-pr_info("четр (resss=%d)\n", resss);
+//resss = rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2, rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
+//pr_info("перв (resss=%d)\n", resss);
+//resss = rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
+//pr_info("два (resss=%d)\n", resss);
+//resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
+//pr_info("три (resss=%d)\n", resss);
+//resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 2, (rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
+//pr_info("четр (resss=%d)\n", resss);
 
 
 /* disable Port0 TSF update*/
