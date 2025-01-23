@@ -6338,6 +6338,10 @@ static ssize_t proc_set_mgnt_inject(
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
 	//ResumeTxBeacon(adapter);
+	rtw_write8(padapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
+	rtw_write8(padapter, REG_TBTT_PROHIBIT + 2,
+		(rtw_read8(padapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
+	
     rtw_mi_tx_beacon_hdl(adapter);
     tx_beacon_hdl(adapter, NULL);
 
