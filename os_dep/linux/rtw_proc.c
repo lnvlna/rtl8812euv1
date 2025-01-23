@@ -6338,8 +6338,8 @@ static ssize_t proc_set_mgnt_inject(
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
 	//ResumeTxBeacon(adapter);
-    //rtw_mi_tx_beacon_hdl(adapter);
-    tx_beacon_hdl(adapter, NULL);
+    rtw_mi_tx_beacon_hdl(adapter);
+    //tx_beacon_hdl(adapter, NULL);
 
 	//rtw_write16(adapter, REG_ATIMWND_8822E, 2);
 	//rtw_hal_set_hwreg(adapter, HW_VAR_BEACON_INTERVAL, 0x05);
