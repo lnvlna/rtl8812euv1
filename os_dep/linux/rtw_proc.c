@@ -6337,9 +6337,9 @@ static ssize_t proc_set_mgnt_inject(
     struct net_device *ndev = data;
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
-	//ResumeTxBeacon(adapter);
-    //rtw_mi_tx_beacon_hdl(adapter);
-    //tx_beacon_hdl(adapter, NULL);
+	ResumeTxBeacon(adapter);
+    rtw_mi_tx_beacon_hdl(adapter);
+    tx_beacon_hdl(adapter, NULL);
 
 int resss;
 	
@@ -6354,31 +6354,31 @@ pr_info("четр (resss=%d)\n", resss);
 
 
 /* disable Port0 TSF update*/
-	rtw_write8(adapter, REG_BCN_CTRL, rtw_read8(adapter, REG_BCN_CTRL) | DIS_TSF_UDT);
-	ResumeTxBeacon(adapter);
+	//rtw_write8(adapter, REG_BCN_CTRL, rtw_read8(adapter, REG_BCN_CTRL) | DIS_TSF_UDT);
+	//ResumeTxBeacon(adapter);
 
-	rtw_write8(adapter, REG_BCN_CTRL, DIS_TSF_UDT | DIS_BCNQ_SUB);
+	//rtw_write8(adapter, REG_BCN_CTRL, DIS_TSF_UDT | DIS_BCNQ_SUB);
 
 		/*enable to rx data frame*/
-	rtw_write16(adapter, REG_RXFLTMAP2, 0xFFFF);
+	//rtw_write16(adapter, REG_RXFLTMAP2, 0xFFFF);
 
 		/*Beacon Control related register for first time*/
-	rtw_write8(adapter, REG_BCNDMATIM, 0x02); /* 2ms */
+	//rtw_write8(adapter, REG_BCNDMATIM, 0x02); /* 2ms */
 
 		/*rtw_write8(Adapter, REG_BCN_MAX_ERR, 0xFF);*/
-	rtw_write8(adapter, REG_ATIMWND, 0x0c); /* 12ms */
-	rtw_write16(adapter, REG_BCNTCFG, 0x00);
+	//rtw_write8(adapter, REG_ATIMWND, 0x0c); /* 12ms */
+	//rtw_write16(adapter, REG_BCNTCFG, 0x00);
 
-	rtw_write16(adapter, REG_TSFTR_SYN_OFFSET, 0x7fff);/* +32767 (~32ms) */
+	//rtw_write16(adapter, REG_TSFTR_SYN_OFFSET, 0x7fff);/* +32767 (~32ms) */
 
 		/*reset TSF*/
-	rtw_write8(adapter, REG_DUAL_TSF_RST, BIT(0));
+	//rtw_write8(adapter, REG_DUAL_TSF_RST, BIT(0));
 
 
-	rtw_write8(adapter, REG_BCN_CTRL, (DIS_TSF_UDT | EN_BCN_FUNCTION | EN_TXBCN_RPT | DIS_BCNQ_SUB));
-	rtw_write8(adapter, REG_CCK_CHECK, rtw_read8(adapter, REG_CCK_CHECK) | BIT_EN_BCN_PKT_REL);
+	//rtw_write8(adapter, REG_BCN_CTRL, (DIS_TSF_UDT | EN_BCN_FUNCTION | EN_TXBCN_RPT | DIS_BCNQ_SUB));
+	//rtw_write8(adapter, REG_CCK_CHECK, rtw_read8(adapter, REG_CCK_CHECK) | BIT_EN_BCN_PKT_REL);
 
-	rtw_write8(adapter, REG_CCK_CHECK, rtw_read8(adapter, REG_CCK_CHECK) & (~BIT_BCN_PORT_SEL));
+	//rtw_write8(adapter, REG_CCK_CHECK, rtw_read8(adapter, REG_CCK_CHECK) & (~BIT_BCN_PORT_SEL));
 	//InitBeaconParameters(adapter);
 	//beacon_function_enable(adapter, _TRUE, _TRUE);
 	//ResumeTxBeacon(adapter);
