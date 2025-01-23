@@ -6343,10 +6343,10 @@ static ssize_t proc_set_mgnt_inject(
 
 	//rtw_write16(adapter, REG_ATIMWND_8822E, 2);
 	//rtw_hal_set_hwreg(adapter, HW_VAR_BEACON_INTERVAL, 0x05);
-	//u16 val16;
-	//u8 val8;
-
-
+	
+	
+	u16 val16;
+	u8 val8;
 	val8 = BIT_DIS_TSF_UDT_8822E;
 	val16 = val8 | (val8 << 8); /* port0 and port1 */
 	rtw_write16(adapter, REG_BCN_CTRL_8822E, val16);
