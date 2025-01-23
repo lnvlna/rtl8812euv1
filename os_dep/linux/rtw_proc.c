@@ -22,7 +22,7 @@
 /* временный вариант, не лучший, но быстро уберёт ошибку */
 //extern void InitBeaconParameters(_adapter *adapter);
 //extern void beacon_function_enable(_adapter *adapter, u8 enable, u8 linked);
-extern void set_beacon_related_registers(_adapter *adapter);
+//extern void set_beacon_related_registers(_adapter *adapter);
 
 
 #ifdef CONFIG_PROC_DEBUG
@@ -6391,7 +6391,7 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
     if (ret == 0) {
         pr_info("Beacon control считан успешно!\n");
 
-    pr_info("Beacon control считан успешно!\n");
+    //pr_info("Beacon control считан успешно!\n");
     pr_info("  rx_bssid_fit  = %d\n", bcn_ctrl.rx_bssid_fit);
     pr_info("  txbcn_rpt     = %d\n", bcn_ctrl.txbcn_rpt);
     pr_info("  tsf_update    = %d\n", bcn_ctrl.tsf_update);
