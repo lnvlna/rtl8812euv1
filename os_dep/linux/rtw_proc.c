@@ -6345,7 +6345,7 @@ rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2,
 	rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
 		(rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
 	
-    rtw_mi_tx_beacon_hdl(adapter);
+    //rtw_mi_tx_beacon_hdl(adapter);
     tx_beacon_hdl(adapter, NULL);
 
 
