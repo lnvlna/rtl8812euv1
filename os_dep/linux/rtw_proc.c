@@ -6337,8 +6337,8 @@ static ssize_t proc_set_mgnt_inject(
     struct net_device *ndev = data;
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
-	//ResumeTxBeacon(adapter);
-    rtw_mi_tx_beacon_hdl(adapter);
+	ResumeTxBeacon(adapter);
+    //rtw_mi_tx_beacon_hdl(adapter);
     //tx_beacon_hdl(adapter, NULL);
 
 	//rtw_write16(adapter, REG_ATIMWND_8822E, 2);
