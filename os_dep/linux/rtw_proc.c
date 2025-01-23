@@ -6408,9 +6408,13 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
 	
 	pr_info("Фрейм успешно отправлен!\n");
 
+	u32 timestamp[2];
+	u32 bcn_interval_us; /* unit : usec */
+	u64 time;
+	u32 cur_tick; /* unit : usec */
 	/* read TSF */
-	timestamp[1] = rtw_read32(padapter, 0x560 + 4);
-	timestamp[0] = rtw_read32(padapter, 0x560);
+	timestamp[1] = rtw_read32(adapter, 0x560 + 4);
+	timestamp[0] = rtw_read32(adapter, 0x560);
 	while (timestamp[1]) {
 		time = (0xFFFFFFFF % bcn_interval_us + 1) * timestamp[1] + timestamp[0];
 		timestamp[0] = (u32)time;
