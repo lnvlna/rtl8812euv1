@@ -22,6 +22,8 @@
 /* временный вариант, не лучший, но быстро уберёт ошибку */
 //extern void InitBeaconParameters(_adapter *adapter);
 //extern void beacon_function_enable(_adapter *adapter, u8 enable, u8 linked);
+extern void set_beacon_related_registers(_adapter *adapter);
+
 
 #ifdef CONFIG_PROC_DEBUG
 
