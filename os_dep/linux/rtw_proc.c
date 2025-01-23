@@ -6339,49 +6339,49 @@ static ssize_t proc_set_mgnt_inject(
 
 	//ResumeTxBeacon(adapter);
     //rtw_mi_tx_beacon_hdl(adapter);
-    //tx_beacon_hdl(adapter, NULL);
+    tx_beacon_hdl(adapter, NULL);
 
 	//rtw_write16(adapter, REG_ATIMWND_8822E, 2);
 	//rtw_hal_set_hwreg(adapter, HW_VAR_BEACON_INTERVAL, 0x05);
 	
 	
-	u16 val16;
-	u8 val8;
-	val8 = BIT_DIS_TSF_UDT_8822E;
-	val16 = val8 | (val8 << 8); /* port0 and port1 */
-	rtw_write16(adapter, REG_BCN_CTRL_8822E, val16);
+	//u16 val16;
+	//u8 val8;
+	//val8 = BIT_DIS_TSF_UDT_8822E;
+	//val16 = val8 | (val8 << 8); /* port0 and port1 */
+	//rtw_write16(adapter, REG_BCN_CTRL_8822E, val16);
 
 	/* TBTT setup time */
-	rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E, TBTT_PROHIBIT_SETUP_TIME);
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E, TBTT_PROHIBIT_SETUP_TIME);
 
 	/* TBTT hold time: 0x540[19:8] */
-	rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E + 1, TBTT_PROHIBIT_HOLD_TIME_STOP_BCN & 0xFF);
-	rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E + 2,
-		(rtw_read8(adapter, REG_TBTT_PROHIBIT_8822E + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME_STOP_BCN >> 8));
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E + 1, TBTT_PROHIBIT_HOLD_TIME_STOP_BCN & 0xFF);
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E + 2,
+	//	(rtw_read8(adapter, REG_TBTT_PROHIBIT_8822E + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME_STOP_BCN >> 8));
 
-	rtw_write8(adapter, REG_DRVERLYINT_8822E, 0x05); /* 5ms */
-	rtw_write8(adapter, REG_BCNDMATIM_8822E, 0x02); /* 2ms */
+	//rtw_write8(adapter, REG_DRVERLYINT_8822E, 0x05); /* 5ms */
+	//rtw_write8(adapter, REG_BCNDMATIM_8822E, 0x02); /* 2ms */
 
 	/*
 	 * Suggested by designer timchen. Change beacon AIFS to the largest number
 	 * beacause test chip does not contension before sending beacon.
 	 */
-	rtw_write16(adapter, REG_BCNTCFG_8822E, 0x4413);
-	rtw_write8(adapter, REG_SLOT_8822E, 0x09);
-	val8 = BIT_TSFTR_RST_8822E;
-	rtw_write8(adapter, REG_DUAL_TSF_RST_8822E, val8);
+	//rtw_write16(adapter, REG_BCNTCFG_8822E, 0x4413);
+	//rtw_write8(adapter, REG_SLOT_8822E, 0x09);
+	//val8 = BIT_TSFTR_RST_8822E;
+	//rtw_write8(adapter, REG_DUAL_TSF_RST_8822E, val8);
 
-	rtw_write8(adapter, REG_RXTSF_OFFSET_CCK_8822E, 0x50);
-	rtw_write8(adapter, REG_RXTSF_OFFSET_OFDM_8822E, 0x50);
+	//rtw_write8(adapter, REG_RXTSF_OFFSET_CCK_8822E, 0x50);
+	//rtw_write8(adapter, REG_RXTSF_OFFSET_OFDM_8822E, 0x50);
 	//u8 val8;
-	u32 bcn_ctrl_reg;
+	//u32 bcn_ctrl_reg;
 
 	/* port0 */
-	bcn_ctrl_reg = REG_BCN_CTRL_8822E;
-	val8  = BIT_DIS_TSF_UDT_8822E | BIT_EN_BCN_FUNCTION_8822E;
-	rtw_write8(adapter, bcn_ctrl_reg, val8);
-	rtw_write8(adapter, REG_RD_CTRL_8822E + 1, 0x6F);
-	ResumeTxBeacon(adapter);
+	//bcn_ctrl_reg = REG_BCN_CTRL_8822E;
+	//val8  = BIT_DIS_TSF_UDT_8822E | BIT_EN_BCN_FUNCTION_8822E;
+	//rtw_write8(adapter, bcn_ctrl_reg, val8);
+	//rtw_write8(adapter, REG_RD_CTRL_8822E + 1, 0x6F);
+	//ResumeTxBeacon(adapter);
 	
 //int resss;
 	
