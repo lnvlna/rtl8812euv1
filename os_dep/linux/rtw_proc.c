@@ -6342,7 +6342,7 @@ static ssize_t proc_set_mgnt_inject(
     //tx_beacon_hdl(adapter, NULL);
 
 	rtw_write16(adapter, REG_ATIMWND_8822E, 2);
-	rtw_hal_set_hwreg(adapter, HW_VAR_BEACON_INTERVAL, (u8 *)100);
+	rtw_hal_set_hwreg(adapter, HW_VAR_BEACON_INTERVAL, 0x05);
 	u16 val16;
 	u8 val8;
 
