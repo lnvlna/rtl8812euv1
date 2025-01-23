@@ -6336,7 +6336,10 @@ static ssize_t proc_set_mgnt_inject(
     char tmp[128]; // для приёма строки из user-space
     struct net_device *ndev = data;
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
-
+	
+rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2,
+		rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
+	rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
 	//ResumeTxBeacon(adapter);
 	rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
 	rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
