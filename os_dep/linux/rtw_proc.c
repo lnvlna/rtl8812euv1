@@ -6341,10 +6341,10 @@ static ssize_t proc_set_mgnt_inject(
     //rtw_mi_tx_beacon_hdl(adapter);
     //tx_beacon_hdl(adapter, NULL);
 
-	rtw_write16(adapter, REG_ATIMWND_8822E, 2);
-	rtw_hal_set_hwreg(adapter, HW_VAR_BEACON_INTERVAL, 0x05);
-	u16 val16;
-	u8 val8;
+	//rtw_write16(adapter, REG_ATIMWND_8822E, 2);
+	//rtw_hal_set_hwreg(adapter, HW_VAR_BEACON_INTERVAL, 0x05);
+	//u16 val16;
+	//u8 val8;
 
 
 	val8 = BIT_DIS_TSF_UDT_8822E;
