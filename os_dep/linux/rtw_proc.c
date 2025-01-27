@@ -28,7 +28,7 @@
 #include "../../include/rtw_cmd.h"
 #include "../../include/rtw_mlme.h"
 #include "../../include/rtw_mlme_ext.h"
-#include "../../hal/hal_com_h2c.h" // для beacon_function_enable и других функций HAL
+//#include "../../hal/hal_com_h2c.h" // для beacon_function_enable и других функций HAL
 // Если определения отсутствуют в заголовочных файлах, добавьте их:
 #ifndef REG_BCN_INTERVAL_8812E
 #define REG_BCN_INTERVAL_8812E    0x0554
