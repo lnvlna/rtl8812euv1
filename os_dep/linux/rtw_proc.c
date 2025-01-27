@@ -6555,7 +6555,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
-		RTW_PROC_HDL_SSEQ("send_response", NULL, proc_set_mgnt_send),
+		//RTW_PROC_HDL_SSEQ("send_response", NULL, proc_set_mgnt_send),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
