@@ -6351,7 +6351,9 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
     struct net_device *dev = data;
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
     char tmp[32];
-    u8 enable;
+    u8 enable, val8;
+    u16 val16;
+    int ret = 0;
 
     if (count < 1)
         return -EFAULT;
@@ -6362,12 +6364,10 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
     }
 
     if (buffer && !copy_from_user(tmp, buffer, count)) {
-        // Парсим параметр enable (0 или 1)
         if (sscanf(tmp, "%hhu", &enable) != 1)
             return -EINVAL;
 
         if (enable) {
-            // Базовый beacon frame
             u8 beacon_frame[] = {
                 /* MAC Header */
                 0x80, 0x00,                         // Frame Control
@@ -6378,44 +6378,91 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
                 0x00, 0x00,                         // Sequence Control
                 
                 /* Beacon body */
-                // Timestamp (8 bytes, будет заполнено аппаратно)
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                // Beacon Interval (2 bytes)
-                0x64, 0x00,    // 100ms = 100 TU
-                // Capability (2 bytes) 
-                0x01, 0x00,    // ESS
-                
-                // SSID (минимальный вариант)
-                0x00,          // Element ID: SSID
-                0x00,          // Length: 0 (пустой SSID)
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Timestamp
+                0x64, 0x00,    // Beacon Interval (100ms)
+                0x01, 0x00,    // Capability (ESS)
+                0x00, 0x00,    // SSID (пустой)
             };
 
-            // Отключаем стандартную отправку beacon
-            rtw_write8(padapter, REG_BCN_CTRL, 
-                      rtw_read8(padapter, REG_BCN_CTRL) & ~BIT_EN_BCN_FUNCTION);
+            // 1. Проверка текущего состояния BCN_CTRL
+            val8 = rtw_read8(padapter, REG_BCN_CTRL);
+            pr_info("Initial BCN_CTRL state: 0x%02x\n", val8);
 
-            // Загружаем beacon frame в TXBUF
-            rtw_hal_fill_fake_txdesc(padapter, beacon_frame, sizeof(beacon_frame),
-                                   _TRUE, _FALSE, _TRUE);
+            // 2. Отключаем все функции beacon
+            val8 &= ~(BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT | BIT_DIS_TSF_UDT);
+            ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
+            pr_info("Disable beacon functions: %s (val=0x%02x)\n", 
+                   ret == _SUCCESS ? "OK" : "FAIL", val8);
 
-            // Настраиваем beacon head и boundary
-            rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, 0x80); // beacon head page
-            rtw_write8(padapter, REG_BCNQ_BDNY_V1, 0x8);     // beacon boundary
+            // 3. Пробуем разные комбинации TBTT
+            val8 = rtw_read8(padapter, REG_TBTT_PROHIBIT);
+            pr_info("Current TBTT_PROHIBIT: 0x%02x\n", val8);
 
-            // Устанавливаем интервал отправки (100ms)
-            rtw_write16(padapter, REG_BCN_INTERVAL_8812E, 100);
+            // Тестируем разные значения TBTT
+            u8 tbtt_values[] = {0x04, 0x08, 0x0c, 0x10};
+            for (int i = 0; i < sizeof(tbtt_values); i++) {
+                ret = rtw_write8(padapter, REG_TBTT_PROHIBIT, tbtt_values[i]);
+                pr_info("Set TBTT_PROHIBIT to 0x%02x: %s\n", 
+                       tbtt_values[i], ret == _SUCCESS ? "OK" : "FAIL");
+            }
 
-            // Включаем отправку beacon
-            rtw_write8(padapter, REG_BCN_CTRL,
-                      rtw_read8(padapter, REG_BCN_CTRL) | BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT);
+            // 4. Настройка FIFO и DMA
+            // Пробуем разные значения head page
+            u16 head_pages[] = {0x80, 0x90, 0xa0};
+            for (int i = 0; i < sizeof(head_pages)/sizeof(head_pages[0]); i++) {
+                ret = rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, head_pages[i]);
+                pr_info("Set FIFO head page to 0x%04x: %s\n", 
+                       head_pages[i], ret == _SUCCESS ? "OK" : "FAIL");
+            }
 
-            RTW_INFO("Beacon injection enabled\n");
+            // 5. Загрузка beacon frame
+            ret = rtw_hal_fill_fake_txdesc(padapter, beacon_frame, 
+                                         sizeof(beacon_frame),
+                                         _TRUE, _FALSE, _TRUE);
+            pr_info("Load beacon frame: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
+
+            // 6. Тестируем разные интервалы beacon
+            u16 intervals[] = {50, 100, 200};
+            for (int i = 0; i < sizeof(intervals)/sizeof(intervals[0]); i++) {
+                ret = rtw_write16(padapter, REG_BCN_INTERVAL_8812E, intervals[i]);
+                pr_info("Set beacon interval to %dms: %s\n", 
+                       intervals[i], ret == _SUCCESS ? "OK" : "FAIL");
+            }
+
+            // 7. Пробуем разные комбинации флагов BCN_CTRL
+            u8 bcn_ctrl_combinations[] = {
+                BIT_EN_BCN_FUNCTION,
+                BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT,
+                BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT | BIT_DIS_TSF_UDT
+            };
+
+            for (int i = 0; i < sizeof(bcn_ctrl_combinations)/sizeof(bcn_ctrl_combinations[0]); i++) {
+                val8 = rtw_read8(padapter, REG_BCN_CTRL);
+                val8 |= bcn_ctrl_combinations[i];
+                ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
+                pr_info("Try BCN_CTRL combination 0x%02x: %s\n", 
+                       val8, ret == _SUCCESS ? "OK" : "FAIL");
+                
+                // Проверяем, что значение записалось корректно
+                u8 read_val = rtw_read8(padapter, REG_BCN_CTRL);
+                pr_info("Verified BCN_CTRL value: 0x%02x\n", read_val);
+                
+                // Небольшая задержка между комбинациями
+                rtw_mdelay(100);
+            }
+
+            pr_info("Beacon injection test completed\n");
+
         } else {
-            // Отключаем отправку beacon
-            rtw_write8(padapter, REG_BCN_CTRL,
-                      rtw_read8(padapter, REG_BCN_CTRL) & ~(BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT));
+            // Отключение всех функций beacon
+            val8 = rtw_read8(padapter, REG_BCN_CTRL);
+            pr_info("Current BCN_CTRL before disable: 0x%02x\n", val8);
             
-            RTW_INFO("Beacon injection disabled\n");
+            val8 &= ~(BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT | BIT_DIS_TSF_UDT);
+            ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
+            
+            pr_info("Disable beacon functions: %s (final val=0x%02x)\n", 
+                   ret == _SUCCESS ? "OK" : "FAIL", val8);
         }
     }
 
