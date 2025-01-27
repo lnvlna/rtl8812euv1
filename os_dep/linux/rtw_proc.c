@@ -19,6 +19,22 @@
 #include "rtw_proc.h"
 #include <rtw_btcoex.h>
 #include "../../hal/hal_halmac.h"
+#include <hal_data.h>
+#include <rtl8812e_hal.h>
+
+// Если определения отсутствуют в заголовочных файлах, добавьте их:
+#ifndef REG_BCN_INTERVAL_8812E
+#define REG_BCN_INTERVAL_8812E    0x0554
+#endif
+
+#ifndef REG_BCNQ_BDNY_V1
+#define REG_BCNQ_BDNY_V1         0x0424
+#endif
+
+#ifndef BIT_P0_EN_TXBCN_RPT
+#define BIT_P0_EN_TXBCN_RPT      BIT(2)
+#endif
+
 /* временный вариант, не лучший, но быстро уберёт ошибку */
 //extern void InitBeaconParameters(_adapter *adapter);
 //extern void beacon_function_enable(_adapter *adapter, u8 enable, u8 linked);
@@ -6357,14 +6373,14 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
                 rtw_write8(padapter, REG_BCN_CTRL, 
                           rtw_read8(padapter, REG_BCN_CTRL) & ~BIT_EN_BCN_FUNCTION);
                 rtw_write8(padapter, REG_BCN_CTRL,
-                          rtw_read8(padapter, REG_BCN_CTRL) | BIT_EN_TXBCN_RPT);
+                          rtw_read8(padapter, REG_BCN_CTRL) | BIT_P0_EN_TXBCN_RPT);
                 rtw_write8(padapter, REG_MBID_NUM,
                           rtw_read8(padapter, REG_MBID_NUM) | BIT_EN_BCN_FUNCTION);
                 
                 pr_info("Включена отправка beacon\n");
             } else {
                 rtw_write8(padapter, REG_BCN_CTRL,
-                          rtw_read8(padapter, REG_BCN_CTRL) & ~(BIT_EN_BCN_FUNCTION | BIT_EN_TXBCN_RPT));
+                          rtw_read8(padapter, REG_BCN_CTRL) & ~(BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT));
                 pr_info("Отключена отправка beacon\n");
             }
         }
@@ -6377,7 +6393,7 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
             if (bcn_cfg.interval_us < 100000 || bcn_cfg.interval_us > 1000000)
                 return -EINVAL;
 
-            rtw_write16(padapter, REG_BCN_INTERVAL, bcn_cfg.interval_us/1024);
+            rtw_write16(padapter, REG_BCN_INTERVAL_8812E, bcn_cfg.interval_us/1024);
             pr_info("Установлен интервал beacon: %u мкс\n", bcn_cfg.interval_us);
         }
         else if (strcmp(cmd, "dtim") == 0) {
@@ -6390,7 +6406,7 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
 
             // Настройка DTIM периода
             val8 = rtw_read8(padapter, REG_DTIM_COUNTER_ROOT);
-            val8 &= ~0xFF;
+            val8 = 0;
             val8 |= bcn_cfg.dtim_period;
             rtw_write8(padapter, REG_DTIM_COUNTER_ROOT, val8);
             
@@ -6443,7 +6459,7 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
             
             // Настраиваем beacon head
             rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, 0x80); // beacon head page
-            rtw_write8(padapter, REG_BCNQ_BDNY, 0x8); // beacon boundary
+            rtw_write8(padapter, REG_BCNQ_BDNY_V1, 0x8); // beacon boundary
 
             pr_info("Установлено содержимое beacon frame (%u байт)\n", bcn_cfg.content_len);
         }
