@@ -6346,137 +6346,80 @@ struct beacon_config {
 };
 
 static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer,
-                                   size_t count, loff_t *pos, void *data) {
+                                   size_t count, loff_t *pos, void *data)
+{
     struct net_device *dev = data;
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-    char tmp[512];
-    struct beacon_config bcn_cfg = {0};
-    u32 timestamp[2];
-    u8 val8;
-    char cmd[16];
+    char tmp[32];
+    u8 enable;
 
-    if (count < 1 || count > sizeof(tmp))
+    if (count < 1)
         return -EFAULT;
 
-    if (buffer && !copy_from_user(tmp, buffer, count)) {
-        // Парсим команду
-        if (sscanf(tmp, "%15s", cmd) != 1)
-            return -EINVAL;
-
-        if (strcmp(cmd, "enable") == 0) {
-            // enable 1/0
-            if (sscanf(tmp, "%*s %hhu", &bcn_cfg.enable) != 1)
-                return -EINVAL;
-
-            if (bcn_cfg.enable) {
-                // Включаем базовую отправку beacon
-                rtw_write8(padapter, REG_BCN_CTRL, 
-                          rtw_read8(padapter, REG_BCN_CTRL) & ~BIT_EN_BCN_FUNCTION);
-                rtw_write8(padapter, REG_BCN_CTRL,
-                          rtw_read8(padapter, REG_BCN_CTRL) | BIT_P0_EN_TXBCN_RPT);
-                rtw_write8(padapter, REG_MBID_NUM,
-                          rtw_read8(padapter, REG_MBID_NUM) | BIT_EN_BCN_FUNCTION);
-                
-                pr_info("Включена отправка beacon\n");
-            } else {
-                rtw_write8(padapter, REG_BCN_CTRL,
-                          rtw_read8(padapter, REG_BCN_CTRL) & ~(BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT));
-                pr_info("Отключена отправка beacon\n");
-            }
-        }
-        else if (strcmp(cmd, "interval") == 0) {
-            // interval <microseconds>
-            if (sscanf(tmp, "%*s %u", &bcn_cfg.interval_us) != 1)
-                return -EINVAL;
-
-            // Проверяем допустимые значения (от 100ms до 1s)
-            if (bcn_cfg.interval_us < 100000 || bcn_cfg.interval_us > 1000000)
-                return -EINVAL;
-
-            rtw_write16(padapter, REG_BCN_INTERVAL_8812E, bcn_cfg.interval_us/1024);
-            pr_info("Установлен интервал beacon: %u мкс\n", bcn_cfg.interval_us);
-        }
-        else if (strcmp(cmd, "dtim") == 0) {
-            // dtim <period>
-            if (sscanf(tmp, "%*s %hhu", &bcn_cfg.dtim_period) != 1)
-                return -EINVAL;
-
-            if (bcn_cfg.dtim_period < 1 || bcn_cfg.dtim_period > 255)
-                return -EINVAL;
-
-            // Настройка DTIM периода
-            val8 = rtw_read8(padapter, REG_DTIM_COUNTER_ROOT);
-            val8 = 0;
-            val8 |= bcn_cfg.dtim_period;
-            rtw_write8(padapter, REG_DTIM_COUNTER_ROOT, val8);
-            
-            pr_info("Установлен DTIM период: %u\n", bcn_cfg.dtim_period);
-        }
-        else if (strcmp(cmd, "tsf") == 0) {
-            // tsf <offset_microseconds>
-            if (sscanf(tmp, "%*s %u", &bcn_cfg.tsf_offset) != 1)
-                return -EINVAL;
-
-            // Читаем текущий TSF
-            timestamp[1] = rtw_read32(padapter, REG_TSFTR + 4);
-            timestamp[0] = rtw_read32(padapter, REG_TSFTR);
-
-            // Добавляем смещение
-            timestamp[0] += bcn_cfg.tsf_offset;
-            if (timestamp[0] < bcn_cfg.tsf_offset) // overflow
-                timestamp[1]++;
-
-            // Записываем новый TSF
-            rtw_write32(padapter, REG_TSFTR, timestamp[0]);
-            rtw_write32(padapter, REG_TSFTR + 4, timestamp[1]);
-
-            pr_info("Установлено смещение TSF: %u мкс\n", bcn_cfg.tsf_offset);
-        }
-        else if (strcmp(cmd, "content") == 0) {
-            // content <hex_string>
-            char *hex_str = tmp + strlen("content") + 1;
-            u16 idx = 0;
-
-            // Конвертируем hex строку в байты
-            while (idx < sizeof(bcn_cfg.content) && *hex_str) {
-                if (sscanf(hex_str, "%2hhx", &bcn_cfg.content[idx]) != 1)
-                    break;
-                idx++;
-                hex_str += 2;
-                while (*hex_str == ' ' || *hex_str == ':')
-                    hex_str++;
-            }
-            bcn_cfg.content_len = idx;
-
-            if (bcn_cfg.content_len < 24) { // Минимальная длина beacon frame
-                pr_err("Слишком короткий beacon frame\n");
-                return -EINVAL;
-            }
-
-            // Загружаем содержимое в TXBUF
-            rtw_hal_fill_fake_txdesc(padapter, &bcn_cfg.content[0], bcn_cfg.content_len,
-                                   _TRUE, _FALSE, _TRUE);
-            
-            // Настраиваем beacon head
-            rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, 0x80); // beacon head page
-            rtw_write8(padapter, REG_BCNQ_BDNY_V1, 0x8); // beacon boundary
-
-            pr_info("Установлено содержимое beacon frame (%u байт)\n", bcn_cfg.content_len);
-        }
-        else {
-            pr_err("Неизвестная команда. Использование:\n");
-            pr_err("  enable 1/0 - включить/выключить отправку beacon\n");
-            pr_err("  interval <microseconds> - установить интервал\n");
-            pr_err("  dtim <period> - установить DTIM период\n");
-            pr_err("  tsf <offset_microseconds> - установить смещение TSF\n");
-            pr_err("  content <hex_string> - установить содержимое beacon frame\n");
-            return -EINVAL;
-        }
-
-        return count;
+    if (count > sizeof(tmp)) {
+        rtw_warn_on(1);
+        return -EFAULT;
     }
 
-    return -EFAULT;
+    if (buffer && !copy_from_user(tmp, buffer, count)) {
+        // Парсим параметр enable (0 или 1)
+        if (sscanf(tmp, "%hhu", &enable) != 1)
+            return -EINVAL;
+
+        if (enable) {
+            // Базовый beacon frame
+            u8 beacon_frame[] = {
+                /* MAC Header */
+                0x80, 0x00,                         // Frame Control
+                0x00, 0x00,                         // Duration
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // DA (broadcast)
+                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, // SA 
+                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, // BSSID
+                0x00, 0x00,                         // Sequence Control
+                
+                /* Beacon body */
+                // Timestamp (8 bytes, будет заполнено аппаратно)
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                // Beacon Interval (2 bytes)
+                0x64, 0x00,    // 100ms = 100 TU
+                // Capability (2 bytes) 
+                0x01, 0x00,    // ESS
+                
+                // SSID (минимальный вариант)
+                0x00,          // Element ID: SSID
+                0x00,          // Length: 0 (пустой SSID)
+            };
+
+            // Отключаем стандартную отправку beacon
+            rtw_write8(padapter, REG_BCN_CTRL, 
+                      rtw_read8(padapter, REG_BCN_CTRL) & ~BIT_EN_BCN_FUNCTION);
+
+            // Загружаем beacon frame в TXBUF
+            rtw_hal_fill_fake_txdesc(padapter, beacon_frame, sizeof(beacon_frame),
+                                   _TRUE, _FALSE, _TRUE);
+
+            // Настраиваем beacon head и boundary
+            rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, 0x80); // beacon head page
+            rtw_write8(padapter, REG_BCNQ_BDNY_V1, 0x8);     // beacon boundary
+
+            // Устанавливаем интервал отправки (100ms)
+            rtw_write16(padapter, REG_BCN_INTERVAL_8812E, 100);
+
+            // Включаем отправку beacon
+            rtw_write8(padapter, REG_BCN_CTRL,
+                      rtw_read8(padapter, REG_BCN_CTRL) | BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT);
+
+            RTW_INFO("Beacon injection enabled\n");
+        } else {
+            // Отключаем отправку beacon
+            rtw_write8(padapter, REG_BCN_CTRL,
+                      rtw_read8(padapter, REG_BCN_CTRL) & ~(BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT));
+            
+            RTW_INFO("Beacon injection disabled\n");
+        }
+    }
+
+    return count;
 }
 
 /*
