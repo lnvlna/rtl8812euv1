@@ -6338,7 +6338,7 @@ static ssize_t proc_set_mgnt_inject(
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
 	//ResumeTxBeacon(adapter);
-    rtw_mi_tx_beacon_hdl(adapter);
+    //rtw_mi_tx_beacon_hdl(adapter);
     //tx_beacon_hdl(adapter, NULL);
 
 
