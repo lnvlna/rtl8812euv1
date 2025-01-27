@@ -6645,7 +6645,6 @@ static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer
 }
 
 
-// Функция-обработчик таймера
 struct tsf_monitor {
     _adapter *padapter;
     struct timer_list timer;
@@ -6683,8 +6682,8 @@ static void tsf_monitor_handler(struct timer_list *t)
     data->last_tsf = current_tsf;
 
     // Выводим значения регистров TSF для конкретного порта
-    u32 tsf_low = rtw_read32(padapter, REG_TSFTR_LOW + (data->port * 8));
-    u32 tsf_high = rtw_read32(padapter, REG_TSFTR_HIGH + (data->port * 8));
+    u32 tsf_low = rtw_read32(padapter, REG_TSFTR + (data->port * 8));
+    u32 tsf_high = rtw_read32(padapter, REG_TSFTR + 4 + (data->port * 8));
     
     RTW_INFO("Port %d TSF Registers - Low: 0x%08x High: 0x%08x\n", 
              data->port, tsf_low, tsf_high);
@@ -6704,7 +6703,7 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
     char tmp[32];
     u32 interval_ms = 1000; // По умолчанию 1 секунда
     u8 port = HW_PORT0;     // По умолчанию порт 0
-    bool start = false;
+    u8 start_val = 0;
 
     if (count < 1)
         return -EFAULT;
@@ -6719,10 +6718,10 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
         // Формат: "<1|0> [interval_ms] [port]"
         // Пример: "1 100 0" - запустить с интервалом 100мс для порта 0
         //         "0" - остановить
-        int num = sscanf(tmp, "%hhu %u %hhu", &start, &interval_ms, &port);
+        int num = sscanf(tmp, "%hhu %u %hhu", &start_val, &interval_ms, &port);
         
         if (num >= 1) {
-            if (start) {
+            if (start_val) {
                 if (tsf_data == NULL) {
                     // Создаем новый монитор
                     tsf_data = rtw_malloc(sizeof(struct tsf_monitor));
@@ -6763,32 +6762,6 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
         }
     }
     return -EFAULT;
-}
-
-// Функция для чтения текущего состояния монитора TSF
-static int proc_get_tsf_monitor(struct seq_file *m, void *v)
-{
-    struct net_device *dev = m->private;
-    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-    
-    if (tsf_data && tsf_data->active) {
-        u64 current_tsf = rtw_hal_get_tsftr_by_port(padapter, tsf_data->port);
-        
-        seq_printf(m, "TSF Monitor Status:\n");
-        seq_printf(m, "Active: Yes\n");
-        seq_printf(m, "Port: %d\n", tsf_data->port);
-        seq_printf(m, "Interval: %u ms\n", tsf_data->interval_ms);
-        seq_printf(m, "Current TSF: %llu\n", current_tsf);
-        seq_printf(m, "Last TSF: %llu\n", tsf_data->last_tsf);
-        if (tsf_data->last_tsf != 0) {
-            seq_printf(m, "Difference: %llu us\n", 
-                      current_tsf - tsf_data->last_tsf);
-        }
-    } else {
-        seq_printf(m, "TSF Monitor Status: Inactive\n");
-    }
-    
-    return 0;
 }
 /*
 * rtw_adapter_proc:
