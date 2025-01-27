@@ -6644,15 +6644,6 @@ static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer
     return count;
 }
 
-struct tsf_monitor {
-    _adapter *padapter;
-    struct timer_list timer;
-    bool active;
-    u64 last_tsf;
-    u32 interval_ms;
-};
-
-static struct tsf_monitor *tsf_data = NULL;
 
 // Функция-обработчик таймера
 struct tsf_monitor {
