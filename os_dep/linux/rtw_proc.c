@@ -6763,6 +6763,32 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
     }
     return -EFAULT;
 }
+
+// Функция для чтения текущего состояния монитора TSF
+static int proc_get_tsf_monitor(struct seq_file *m, void *v)
+{
+    struct net_device *dev = m->private;
+    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+    
+    if (tsf_data && tsf_data->active) {
+        u64 current_tsf = rtw_hal_get_tsftr_by_port(padapter, tsf_data->port);
+        
+        seq_printf(m, "TSF Monitor Status:\n");
+        seq_printf(m, "Active: Yes\n");
+        seq_printf(m, "Port: %d\n", tsf_data->port);
+        seq_printf(m, "Interval: %u ms\n", tsf_data->interval_ms);
+        seq_printf(m, "Current TSF: %llu\n", current_tsf);
+        seq_printf(m, "Last TSF: %llu\n", tsf_data->last_tsf);
+        if (tsf_data->last_tsf != 0) {
+            seq_printf(m, "Difference: %llu us\n", 
+                      current_tsf - tsf_data->last_tsf);
+        }
+    } else {
+        seq_printf(m, "TSF Monitor Status: Inactive\n");
+    }
+    
+    return 0;
+}
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
