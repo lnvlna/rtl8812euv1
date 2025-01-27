@@ -6351,7 +6351,7 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
     struct net_device *dev = data;
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
     char tmp[32];
-    u8 enable, val8;
+    u8 enable, val8, orig_val8;
     int ret = 0;
 
     if (count < 1)
@@ -6384,9 +6384,9 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
                 0x00, 0x00,                         // SSID (пустой)
             };
 
-            // 1. Сохраняем текущее состояние BCN_CTRL
-            val8 = rtw_read8(padapter, REG_BCN_CTRL);
-            pr_info("Original BCN_CTRL: 0x%02x\n", val8);
+            // 1. Сохраняем текущее состояние
+            orig_val8 = rtw_read8(padapter, REG_BCN_CTRL);
+            pr_info("Original BCN_CTRL: 0x%02x\n", orig_val8);
 
             // 2. Отключаем все функции beacon
             ret = rtw_write8(padapter, REG_BCN_CTRL, 0x00);
@@ -6394,52 +6394,67 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
                 pr_err("Failed to disable beacon functions\n");
                 return count;
             }
+            pr_info("Beacon functions disabled\n");
 
-            // 3. Настраиваем FIFO для однократной отправки
-            ret = rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, 0x80);
-            if (ret != _SUCCESS) {
-                pr_err("Failed to set FIFO page\n");
+            // Проверяем, что запись прошла успешно
+            val8 = rtw_read8(padapter, REG_BCN_CTRL);
+            if (val8 != 0x00) {
+                pr_err("BCN_CTRL write verification failed: 0x%02x\n", val8);
                 goto restore;
             }
 
-            // 4. Загружаем beacon frame в память
+            // 3. Настраиваем FIFO
+            ret = rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, 0x80);
+            pr_info("FIFO page set: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
+            if (ret != _SUCCESS) {
+                goto restore;
+            }
+
+            // 4. Загружаем beacon frame
             rtw_hal_fill_fake_txdesc(padapter, beacon_frame, 
                                    sizeof(beacon_frame),
                                    _TRUE, _FALSE, _TRUE);
             pr_info("Beacon frame loaded\n");
 
-            // 5. Устанавливаем минимальный интервал
-            ret = rtw_write16(padapter, REG_BCN_INTERVAL_8812E, 1);
+            // 5. Устанавливаем интервал (100ms)
+            ret = rtw_write16(padapter, REG_BCN_INTERVAL_8812E, 100);
+            pr_info("Beacon interval set: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
             if (ret != _SUCCESS) {
-                pr_err("Failed to set beacon interval\n");
                 goto restore;
             }
 
-            // 6. Включаем только необходимые биты для однократной отправки
-            val8 = BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT;
+            // 6. Включаем только необходимые биты
+            val8 = BIT_EN_BCN_FUNCTION;  // Сначала только функцию beacon
             ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
+            pr_info("Basic beacon function enabled: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
             if (ret != _SUCCESS) {
-                pr_err("Failed to enable beacon transmission\n");
                 goto restore;
             }
 
-            pr_info("Beacon transmission triggered\n");
+            // Небольшая задержка
+            msleep(1);
 
-            // 7. Ждем короткое время для отправки
-            rtw_mdelay_os(10);
+            // Добавляем бит отчета
+            val8 |= BIT_P0_EN_TXBCN_RPT;
+            ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
+            pr_info("Beacon report enabled: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
+
+            // Ждем отправки (используем msleep вместо mdelay)
+            msleep(2);
 
 restore:
-            // 8. Восстанавливаем оригинальные настройки
-            rtw_write8(padapter, REG_BCN_CTRL, 0x00);
-            rtw_mdelay_os(1);
-            rtw_write8(padapter, REG_BCN_CTRL, val8);
-            pr_info("Settings restored\n");
+            // 7. Восстанавливаем настройки
+            pr_info("Restoring original settings...\n");
+            ret = rtw_write8(padapter, REG_BCN_CTRL, 0x00);
+            msleep(1);
+            ret = rtw_write8(padapter, REG_BCN_CTRL, orig_val8);
+            pr_info("Original settings restored\n");
 
         } else {
-            // При записи 0 просто отключаем beacon
+            // Отключаем все функции beacon
             val8 = rtw_read8(padapter, REG_BCN_CTRL);
             val8 &= ~(BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT);
-            rtw_write8(padapter, REG_BCN_CTRL, val8);
+            ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
             pr_info("Beacon functions disabled\n");
         }
     }
