@@ -6337,15 +6337,15 @@ static ssize_t proc_set_mgnt_inject(
     struct net_device *ndev = data;
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 	
-rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2,
-		rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
-	rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
-	//ResumeTxBeacon(adapter);
-	rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
-	rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
-		(rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
+//rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2,
+		//rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
+	ResumeTxBeacon(adapter);
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
+		//(rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
 	
-    //rtw_mi_tx_beacon_hdl(adapter);
+    rtw_mi_tx_beacon_hdl(adapter);
     //tx_beacon_hdl(adapter, NULL);
 
 
@@ -6544,88 +6544,6 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
     return count;
 }
 
-ssize_t proc_set_mgnt_send(struct file *file, const char __user *buffer,
-                          size_t count, loff_t *pos, void *data) 
-{
-    _adapter *adapter = (_adapter *)data;
-    struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
-    struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-    WLAN_BSSID_EX *network = &(pmlmeinfo->network);
-    
-    // Формируем базовый probe response
-    u8 *pframe;
-    struct rtw_ieee80211_hdr *pwlanhdr;
-    u16 *fctrl;
-    u8 *mac;
-    u8 bssid[ETH_ALEN];
-    u32 pktlen;
-    struct xmit_frame *pmgntframe;
-    struct pkt_attrib *pattrib;
-    
-    // Выделяем память под фрейм
-    pmgntframe = alloc_mgtxmitframe(&adapter->xmitpriv);
-    if (!pmgntframe)
-        return count;
-        
-    // Заполняем атрибуты
-    pattrib = &pmgntframe->attrib;
-    update_mgntframe_attrib(adapter, pattrib);
-    pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
-    pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
-    
-    fctrl = &(pwlanhdr->frame_ctl);
-    *(fctrl) = 0;
-    
-    // Заполняем адреса
-    _rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
-    _rtw_memcpy(pwlanhdr->addr3, adapter_mac_addr(adapter), ETH_ALEN);
-    
-    SetSeqNum(pwlanhdr, 0);
-    set_frame_sub_type(fctrl, WIFI_PROBERSP);
-    
-    pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
-    pframe += pktlen;
-    
-    // Добавляем фиксированные поля
-    pframe += 8; // timestamp будет добавлен аппаратно
-    pktlen += 8;
-    
-    // beacon interval
-    _rtw_memcpy(pframe, &pmlmeinfo->bcn_interval, 2);
-    pframe += 2;
-    pktlen += 2;
-    
-    // capability info
-    _rtw_memcpy(pframe, &pmlmeinfo->capability, 2); 
-    pframe += 2;
-    pktlen += 2;
-
-    // Добавляем SSID
-    pframe = rtw_set_ie(pframe, _SSID_IE_, network->Ssid.SsidLength,
-                        network->Ssid.Ssid, &pktlen);
-                        
-    // Добавляем supported rates
-    u8 rate_len = 0;
-    u8 *rate_set = network->SupportedRates;
-    while (rate_set[rate_len] != 0 && rate_len < NDIS_802_11_LENGTH_RATES_EX)
-        rate_len++;
-        
-    pframe = rtw_set_ie(pframe, _SUPPORTEDRATES_IE_, rate_len,
-                        rate_set, &pktlen);
-                        
-    pattrib->pktlen = pktlen;
-    
-    // Настраиваем аппаратный таймер для периодической отправки
-    rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
-    rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
-    rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
-        (rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
-        
-    // Отправляем фрейм
-    dump_mgntframe(adapter, pmgntframe);
-    
-    return count;
-}
 
 
 /*
