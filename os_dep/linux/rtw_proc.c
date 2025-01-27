@@ -6544,9 +6544,13 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
     return count;
 }
 
-void proc_set_mgnt_send(_adapter *adapter) {
+ssize_t proc_set_mgnt_send(struct file *file, const char __user *buffer,
+                          size_t count, loff_t *pos, void *data) 
+{
+    _adapter *adapter = (_adapter *)data;
     struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
     struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+    WLAN_BSSID_EX *network = &(pmlmeinfo->network);
     
     // Формируем базовый probe response
     u8 *pframe;
@@ -6561,7 +6565,7 @@ void proc_set_mgnt_send(_adapter *adapter) {
     // Выделяем память под фрейм
     pmgntframe = alloc_mgtxmitframe(&adapter->xmitpriv);
     if (!pmgntframe)
-        return;
+        return count;
         
     // Заполняем атрибуты
     pattrib = &pmgntframe->attrib;
@@ -6597,12 +6601,17 @@ void proc_set_mgnt_send(_adapter *adapter) {
     pktlen += 2;
 
     // Добавляем SSID
-    pframe = rtw_set_ie(pframe, _SSID_IE_, pmlmeinfo->network.Ssid.SsidLength,
-                        pmlmeinfo->network.Ssid.Ssid, &pktlen);
+    pframe = rtw_set_ie(pframe, _SSID_IE_, network->Ssid.SsidLength,
+                        network->Ssid.Ssid, &pktlen);
                         
     // Добавляем supported rates
-    pframe = rtw_set_ie(pframe, _SUPPORTEDRATES_IE_, pmlmeinfo->network.SupportedRates.Length,
-                        pmlmeinfo->network.SupportedRates.Content, &pktlen);
+    u8 rate_len = 0;
+    u8 *rate_set = network->SupportedRates;
+    while (rate_set[rate_len] != 0 && rate_len < NDIS_802_11_LENGTH_RATES_EX)
+        rate_len++;
+        
+    pframe = rtw_set_ie(pframe, _SUPPORTEDRATES_IE_, rate_len,
+                        rate_set, &pktlen);
                         
     pattrib->pktlen = pktlen;
     
@@ -6614,6 +6623,8 @@ void proc_set_mgnt_send(_adapter *adapter) {
         
     // Отправляем фрейм
     dump_mgntframe(adapter, pmgntframe);
+    
+    return count;
 }
 
 
