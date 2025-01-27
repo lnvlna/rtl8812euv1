@@ -6544,6 +6544,78 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
     return count;
 }
 
+static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer,
+                                   size_t count, loff_t *pos, void *data)
+{
+    struct net_device *dev = data;
+    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+    struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+    struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+    WLAN_BSSID_EX *pnetwork = &(pmlmeinfo->network);
+    unsigned char *pbuf;
+    u32 len;
+    
+    // Выделяем память под beacon фрейм
+    pbuf = rtw_zmalloc(MAX_BEACON_LEN);
+    if (!pbuf)
+        return -ENOMEM;
+
+    // Формируем заголовок beacon фрейма
+    len = 0;
+    pbuf[0] = WIFI_BEACON;
+    pbuf[1] = 0;
+    len = 2;
+
+    // Добавляем timestamp (8 байт)
+    _rtw_memset(pbuf + len, 0, 8);
+    len += 8;
+
+    // Добавляем beacon interval (2 байта)
+    _rtw_memcpy(pbuf + len, &pmlmeinfo->network.Configuration.BeaconPeriod, 2);
+    len += 2;
+
+    // Добавляем capability info (2 байта)
+    _rtw_memcpy(pbuf + len, &pmlmeinfo->network.Capability, 2); 
+    len += 2;
+
+    // SSID
+    pbuf[len++] = _SSID_IE_;
+    pbuf[len++] = pmlmeinfo->network.Ssid.SsidLength;
+    _rtw_memcpy(pbuf + len, pmlmeinfo->network.Ssid.Ssid, pmlmeinfo->network.Ssid.SsidLength);
+    len += pmlmeinfo->network.Ssid.SsidLength;
+
+    // Supported rates
+    pbuf[len++] = _SUPPORTEDRATES_IE_;
+    pbuf[len++] = 8;
+    _rtw_memcpy(pbuf + len, pmlmeinfo->network.SupportedRates, 8);
+    len += 8;
+
+    // DS Parameter Set
+    pbuf[len++] = _DSSET_IE_;
+    pbuf[len++] = 1;
+    pbuf[len++] = pmlmeext->cur_channel;
+
+    // TIM
+    pbuf[len++] = _TIM_IE_;
+    pbuf[len++] = 4;
+    pbuf[len++] = 0; // DTIM count
+    pbuf[len++] = 1; // DTIM period
+    pbuf[len++] = 0; // Bitmap control 
+    pbuf[len++] = 0; // Bitmap
+
+    RTW_INFO("Sending beacon frame, len=%d\n", len);
+
+    // Отправляем beacon через HAL
+    if (rtw_hal_mgnt_xmit(padapter, pbuf, len) == _FAIL) {
+        RTW_INFO("Beacon send failed!\n");
+        rtw_mfree(pbuf, MAX_BEACON_LEN);
+        return -EFAULT;
+    }
+
+    rtw_mfree(pbuf, MAX_BEACON_LEN);
+    return count;
+}
+
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
@@ -6553,6 +6625,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
+		RTW_PROC_HDL_SSEQ("send_beacon", NULL, proc_set_send_beacon),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
