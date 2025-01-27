@@ -6655,6 +6655,18 @@ struct tsf_monitor {
 static struct tsf_monitor *tsf_data = NULL;
 
 // Функция-обработчик таймера
+struct tsf_monitor {
+    _adapter *padapter;
+    struct timer_list timer;
+    bool active;
+    u64 last_tsf;
+    u32 interval_ms;
+    u8 port;  // Добавляем порт для мониторинга
+};
+
+static struct tsf_monitor *tsf_data = NULL;
+
+// Функция-обработчик таймера
 static void tsf_monitor_handler(struct timer_list *t)
 {
     struct tsf_monitor *data = from_timer(data, t, timer);
@@ -6665,24 +6677,26 @@ static void tsf_monitor_handler(struct timer_list *t)
     if (!data->active)
         return;
 
-    // Читаем текущее значение TSF из регистров
-    current_tsf = rtw_hal_get_tsf(padapter);
+    // Читаем текущее значение TSF из регистров для конкретного порта
+    current_tsf = rtw_hal_get_tsftr_by_port(padapter, data->port);
     
     // Вычисляем разницу с предыдущим значением
     if (data->last_tsf != 0) {
         tsf_diff = current_tsf - data->last_tsf;
-        RTW_INFO("TSF: %llu (diff: %llu us)\n", current_tsf, tsf_diff);
+        RTW_INFO("Port %d TSF: %llu (diff: %llu us)\n", 
+                 data->port, current_tsf, tsf_diff);
     } else {
-        RTW_INFO("TSF: %llu\n", current_tsf);
+        RTW_INFO("Port %d TSF: %llu\n", data->port, current_tsf);
     }
     
     data->last_tsf = current_tsf;
 
-    // Также можно вывести значения отдельных регистров TSF
-    u32 tsf_low = rtw_read32(padapter, REG_TSFTR);
-    u32 tsf_high = rtw_read32(padapter, REG_TSFTR + 4);
+    // Выводим значения регистров TSF для конкретного порта
+    u32 tsf_low = rtw_read32(padapter, REG_TSFTR_LOW + (data->port * 8));
+    u32 tsf_high = rtw_read32(padapter, REG_TSFTR_HIGH + (data->port * 8));
     
-    RTW_INFO("TSF Registers - Low: 0x%08x High: 0x%08x\n", tsf_low, tsf_high);
+    RTW_INFO("Port %d TSF Registers - Low: 0x%08x High: 0x%08x\n", 
+             data->port, tsf_low, tsf_high);
 
     // Перезапускаем таймер
     if (data->active) {
@@ -6698,6 +6712,7 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
     char tmp[32];
     u32 interval_ms = 1000; // По умолчанию 1 секунда
+    u8 port = HW_PORT0;     // По умолчанию порт 0
     bool start = false;
 
     if (count < 1)
@@ -6710,10 +6725,10 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
 
     if (buffer && !copy_from_user(tmp, buffer, count)) {
         // Парсим входные данные
-        // Формат: "<1|0> [interval_ms]"
-        // Пример: "1 100" - запустить с интервалом 100мс
+        // Формат: "<1|0> [interval_ms] [port]"
+        // Пример: "1 100 0" - запустить с интервалом 100мс для порта 0
         //         "0" - остановить
-        int num = sscanf(tmp, "%hhu %u", &start, &interval_ms);
+        int num = sscanf(tmp, "%hhu %u %hhu", &start, &interval_ms, &port);
         
         if (num >= 1) {
             if (start) {
@@ -6727,17 +6742,21 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
                     tsf_data->active = true;
                     tsf_data->last_tsf = 0;
                     tsf_data->interval_ms = interval_ms;
+                    tsf_data->port = port;
 
                     // Инициализация таймера
                     timer_setup(&tsf_data->timer, tsf_monitor_handler, 0);
                     mod_timer(&tsf_data->timer, 
                              jiffies + msecs_to_jiffies(tsf_data->interval_ms));
                     
-                    RTW_INFO("TSF monitor started with interval %ums\n", interval_ms);
+                    RTW_INFO("TSF monitor started for port %d with interval %ums\n", 
+                            port, interval_ms);
                 } else {
-                    // Обновляем интервал если монитор уже запущен
+                    // Обновляем параметры если монитор уже запущен
                     tsf_data->interval_ms = interval_ms;
-                    RTW_INFO("TSF monitor interval updated to %ums\n", interval_ms);
+                    tsf_data->port = port;
+                    RTW_INFO("TSF monitor updated: port %d, interval %ums\n", 
+                            port, interval_ms);
                 }
             } else {
                 // Останавливаем монитор
@@ -6762,10 +6781,11 @@ static int proc_get_tsf_monitor(struct seq_file *m, void *v)
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
     
     if (tsf_data && tsf_data->active) {
-        u64 current_tsf = rtw_hal_get_tsf(padapter);
+        u64 current_tsf = rtw_hal_get_tsftr_by_port(padapter, tsf_data->port);
         
         seq_printf(m, "TSF Monitor Status:\n");
         seq_printf(m, "Active: Yes\n");
+        seq_printf(m, "Port: %d\n", tsf_data->port);
         seq_printf(m, "Interval: %u ms\n", tsf_data->interval_ms);
         seq_printf(m, "Current TSF: %llu\n", current_tsf);
         seq_printf(m, "Last TSF: %llu\n", tsf_data->last_tsf);
