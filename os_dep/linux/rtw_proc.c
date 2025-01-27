@@ -6469,7 +6469,6 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
 
     return count;
 }
-
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
