@@ -6544,32 +6544,77 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
     return count;
 }
 
-static ssize_t proc_set_probe_resp(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
-{
-    struct net_device *dev = data;
-    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-    struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+void proc_set_mgnt_send(_adapter *adapter) {
+    struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
     struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-    char tmp[32];
-    u8 target_addr[ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // broadcast по умолчанию
+    
+    // Формируем базовый probe response
+    u8 *pframe;
+    struct rtw_ieee80211_hdr *pwlanhdr;
+    u16 *fctrl;
+    u8 *mac;
+    u8 bssid[ETH_ALEN];
+    u32 pktlen;
+    struct xmit_frame *pmgntframe;
+    struct pkt_attrib *pattrib;
+    
+    // Выделяем память под фрейм
+    pmgntframe = alloc_mgtxmitframe(&adapter->xmitpriv);
+    if (!pmgntframe)
+        return;
+        
+    // Заполняем атрибуты
+    pattrib = &pmgntframe->attrib;
+    update_mgntframe_attrib(adapter, pattrib);
+    pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
+    pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+    
+    fctrl = &(pwlanhdr->frame_ctl);
+    *(fctrl) = 0;
+    
+    // Заполняем адреса
+    _rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
+    _rtw_memcpy(pwlanhdr->addr3, adapter_mac_addr(adapter), ETH_ALEN);
+    
+    SetSeqNum(pwlanhdr, 0);
+    set_frame_sub_type(fctrl, WIFI_PROBERSP);
+    
+    pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
+    pframe += pktlen;
+    
+    // Добавляем фиксированные поля
+    pframe += 8; // timestamp будет добавлен аппаратно
+    pktlen += 8;
+    
+    // beacon interval
+    _rtw_memcpy(pframe, &pmlmeinfo->bcn_interval, 2);
+    pframe += 2;
+    pktlen += 2;
+    
+    // capability info
+    _rtw_memcpy(pframe, &pmlmeinfo->capability, 2); 
+    pframe += 2;
+    pktlen += 2;
 
-    if (count > sizeof(tmp)) {
-        RTW_INFO("buffer size is too large\n");
-        return -EFAULT;
-    }
-
-    if (buffer && !copy_from_user(tmp, buffer, count)) {
-        // Можно добавить парсинг MAC-адреса получателя из tmp если нужно
-    }
-
-    issue_probersp(padapter, target_addr, _FALSE);
-    RTW_INFO("Probe Response отправлен\n");
-
-    return count;
+    // Добавляем SSID
+    pframe = rtw_set_ie(pframe, _SSID_IE_, pmlmeinfo->network.Ssid.SsidLength,
+                        pmlmeinfo->network.Ssid.Ssid, &pktlen);
+                        
+    // Добавляем supported rates
+    pframe = rtw_set_ie(pframe, _SUPPORTEDRATES_IE_, pmlmeinfo->network.SupportedRates.Length,
+                        pmlmeinfo->network.SupportedRates.Content, &pktlen);
+                        
+    pattrib->pktlen = pktlen;
+    
+    // Настраиваем аппаратный таймер для периодической отправки
+    rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
+    rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
+    rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
+        (rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
+        
+    // Отправляем фрейм
+    dump_mgntframe(adapter, pmgntframe);
 }
-
-
-
 
 
 /*
@@ -6581,7 +6626,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
-		RTW_PROC_HDL_SSEQ("send_beacon", NULL, proc_set_probe_resp),
+		RTW_PROC_HDL_SSEQ("send_response", NULL, proc_set_mgnt_send),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
