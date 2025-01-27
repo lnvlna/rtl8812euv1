@@ -6346,7 +6346,7 @@ static ssize_t proc_set_mgnt_inject(
 		//(rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
 	
     rtw_mi_tx_beacon_hdl(adapter);
-    //tx_beacon_hdl(adapter, NULL);
+    tx_beacon_hdl(adapter, NULL);
 
 
 
