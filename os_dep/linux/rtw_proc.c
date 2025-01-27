@@ -19,29 +19,6 @@
 #include "rtw_proc.h"
 #include <rtw_btcoex.h>
 #include "../../hal/hal_halmac.h"
-#include "../../hal/rtl8822e/rtl8822e.h"
-#include "../../include/rtl8822e_hal.h"
-// Инклуды драйвера (относительно корневой директории драйвера)
-#include "../../include/drv_types.h"
-#include "../../include/hal_data.h"
-#include "../../include/rtw_debug.h"
-#include "../../include/rtw_cmd.h"
-#include "../../include/rtw_mlme.h"
-#include "../../include/rtw_mlme_ext.h"
-#include "../../include/hal_com.h" // для beacon_function_enable и других функций HAL
-// Если определения отсутствуют в заголовочных файлах, добавьте их:
-#ifndef REG_BCN_INTERVAL_8812E
-#define REG_BCN_INTERVAL_8812E    0x0554
-#endif
-
-#ifndef REG_BCNQ_BDNY_V1
-#define REG_BCNQ_BDNY_V1         0x0424
-#endif
-
-#ifndef BIT_P0_EN_TXBCN_RPT
-#define BIT_P0_EN_TXBCN_RPT      BIT(2)
-#endif
-
 /* временный вариант, не лучший, но быстро уберёт ошибку */
 //extern void InitBeaconParameters(_adapter *adapter);
 //extern void beacon_function_enable(_adapter *adapter, u8 enable, u8 linked);
@@ -6343,64 +6320,230 @@ static ssize_t proc_set_bf_monitor_en(struct file *file, const char __user *buff
 }
 #endif
 
-//static ssize_t proc_set_mgnt_inject(){}
 
-struct beacon_config {
-    u8 enable;
-    u32 interval_us;    // интервал в микросекундах
-    u8 dtim_period;     // DTIM период
-    u32 tsf_offset;     // смещение TSF
-    u8 content[256];    // содержимое beacon frame
-    u16 content_len;    // длина содержимого
-};
 
-static ssize_t proc_set_beacon_test(struct file *file, const char __user *buffer,
-                                  size_t count, loff_t *pos, void *data)
+static ssize_t proc_set_mgnt_inject(
+    struct file *file,
+    const char __user *buffer,
+    size_t count,
+    loff_t *pos,
+    void *data
+)
 {
-    struct net_device *dev = data;
-    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-    struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
-    char tmp[32];
-    u8 enable;
-    u32 interval = 100000; // 100ms по умолчанию
-    
-    if (!buffer || count < 1)
-        return -EFAULT;
 
-    if (count > sizeof(tmp)) {
-        rtw_warn_on(1);
+    
+    // Здесь будет наш код
+    char tmp[128]; // для приёма строки из user-space
+    struct net_device *ndev = data;
+    _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
+	
+rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2,
+		rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
+	rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
+	//ResumeTxBeacon(adapter);
+	rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
+	rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
+		(rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
+	
+    //rtw_mi_tx_beacon_hdl(adapter);
+    //tx_beacon_hdl(adapter, NULL);
+
+
+
+	//rtw_write16(adapter, REG_ATIMWND_8822E, 2);
+	//rtw_hal_set_hwreg(adapter, HW_VAR_BEACON_INTERVAL, 0x05);
+	
+	
+	//u16 val16;
+	//u8 val8;
+	//val8 = BIT_DIS_TSF_UDT_8822E;
+	//val16 = val8 | (val8 << 8); /* port0 and port1 */
+	//rtw_write16(adapter, REG_BCN_CTRL_8822E, val16);
+
+	/* TBTT setup time */
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E, TBTT_PROHIBIT_SETUP_TIME);
+
+	/* TBTT hold time: 0x540[19:8] */
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E + 1, TBTT_PROHIBIT_HOLD_TIME_STOP_BCN & 0xFF);
+	//rtw_write8(adapter, REG_TBTT_PROHIBIT_8822E + 2,
+	//	(rtw_read8(adapter, REG_TBTT_PROHIBIT_8822E + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME_STOP_BCN >> 8));
+
+	//rtw_write8(adapter, REG_DRVERLYINT_8822E, 0x05); /* 5ms */
+	//rtw_write8(adapter, REG_BCNDMATIM_8822E, 0x02); /* 2ms */
+
+	/*
+	 * Suggested by designer timchen. Change beacon AIFS to the largest number
+	 * beacause test chip does not contension before sending beacon.
+	 */
+	//rtw_write16(adapter, REG_BCNTCFG_8822E, 0x4413);
+	//rtw_write8(adapter, REG_SLOT_8822E, 0x09);
+	//val8 = BIT_TSFTR_RST_8822E;
+	//rtw_write8(adapter, REG_DUAL_TSF_RST_8822E, val8);
+
+	//rtw_write8(adapter, REG_RXTSF_OFFSET_CCK_8822E, 0x50);
+	//rtw_write8(adapter, REG_RXTSF_OFFSET_OFDM_8822E, 0x50);
+	//u8 val8;
+	//u32 bcn_ctrl_reg;
+
+	/* port0 */
+	//bcn_ctrl_reg = REG_BCN_CTRL_8822E;
+	//val8  = BIT_DIS_TSF_UDT_8822E | BIT_EN_BCN_FUNCTION_8822E;
+	//rtw_write8(adapter, bcn_ctrl_reg, val8);
+	//rtw_write8(adapter, REG_RD_CTRL_8822E + 1, 0x6F);
+	//ResumeTxBeacon(adapter);
+	
+//int resss;
+	
+//resss = rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2, rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
+//pr_info("перв (resss=%d)\n", resss);
+//resss = rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
+//pr_info("два (resss=%d)\n", resss);
+//resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
+//pr_info("три (resss=%d)\n", resss);
+//resss = rtw_write8(adapter, REG_TBTT_PROHIBIT + 2, (rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
+//pr_info("четр (resss=%d)\n", resss);
+
+
+/* disable Port0 TSF update*/
+	//rtw_write8(adapter, REG_BCN_CTRL, rtw_read8(adapter, REG_BCN_CTRL) | DIS_TSF_UDT);
+	//ResumeTxBeacon(adapter);
+
+	//rtw_write8(adapter, REG_BCN_CTRL, DIS_TSF_UDT | DIS_BCNQ_SUB);
+
+		/*enable to rx data frame*/
+	//rtw_write16(adapter, REG_RXFLTMAP2, 0xFFFF);
+
+		/*Beacon Control related register for first time*/
+	//rtw_write8(adapter, REG_BCNDMATIM, 0x02); /* 2ms */
+
+		/*rtw_write8(Adapter, REG_BCN_MAX_ERR, 0xFF);*/
+	//rtw_write8(adapter, REG_ATIMWND, 0x0c); /* 12ms */
+	//rtw_write16(adapter, REG_BCNTCFG, 0x00);
+
+	//rtw_write16(adapter, REG_TSFTR_SYN_OFFSET, 0x7fff);/* +32767 (~32ms) */
+
+		/*reset TSF*/
+	//rtw_write8(adapter, REG_DUAL_TSF_RST, BIT(0));
+
+
+	//rtw_write8(adapter, REG_BCN_CTRL, (DIS_TSF_UDT | EN_BCN_FUNCTION | EN_TXBCN_RPT | DIS_BCNQ_SUB));
+	//rtw_write8(adapter, REG_CCK_CHECK, rtw_read8(adapter, REG_CCK_CHECK) | BIT_EN_BCN_PKT_REL);
+
+	//rtw_write8(adapter, REG_CCK_CHECK, rtw_read8(adapter, REG_CCK_CHECK) & (~BIT_BCN_PORT_SEL));
+	//InitBeaconParameters(adapter);
+	//beacon_function_enable(adapter, _TRUE, _TRUE);
+	//ResumeTxBeacon(adapter);
+	//set_beacon_related_registers(adapter);
+
+	
+enum _hw_port hwport = HW_PORT0;  // Или другой порт, если требуется
+    struct rtw_halmac_bcn_ctrl bcn_ctrl;
+    int ret;
+
+	ret = rtw_halmac_get_bcn_ctrl(adapter_to_dvobj(adapter), hwport, &bcn_ctrl);
+    if (ret == 0) {
+        pr_info("Beacon control считан успешно!\n");
+
+    //pr_info("Beacon control считан успешно!\n");
+    pr_info("  rx_bssid_fit  = %d\n", bcn_ctrl.rx_bssid_fit);
+    pr_info("  txbcn_rpt     = %d\n", bcn_ctrl.txbcn_rpt);
+    pr_info("  tsf_update    = %d\n", bcn_ctrl.tsf_update);
+    pr_info("  enable_bcn    = %d\n", bcn_ctrl.enable_bcn);
+    pr_info("  rxbcn_rpt     = %d\n", bcn_ctrl.rxbcn_rpt);
+    pr_info("  p2p_ctwin     = %d\n", bcn_ctrl.p2p_ctwin);
+    pr_info("  p2p_bcn_area  = %d\n", bcn_ctrl.p2p_bcn_area);
+
+    } else {
+        pr_info("Не удалось считать beacon control (ret=%d)\n", ret);
+    }
+	
+	pr_info("Фрейм успешно отправлен!\n");
+
+	u32 timestamp[2];
+	u32 bcn_interval_us; /* unit : usec */
+	u64 time;
+	u32 cur_tick; /* unit : usec */
+	/* read TSF */
+	timestamp[1] = rtw_read32(adapter, 0x560 + 4);
+	timestamp[0] = rtw_read32(adapter, 0x560);
+	while (timestamp[1]) {
+		time = (0xFFFFFFFF % bcn_interval_us + 1) * timestamp[1] + timestamp[0];
+		timestamp[0] = (u32)time;
+		timestamp[1] = (u32)(time >> 32);
+	}
+	cur_tick = timestamp[0] % bcn_interval_us;
+	pr_info("tsf cur_tick (cur_tick=%d)\n", cur_tick);
+	
+    // простой пример статического mgmt-фрейма (чисто демонстрация)
+    // В реальности вы, конечно, сформируете нужный вам содержимый буфер
+    static const u8 test_mgmt[] = {
+        0x40, 0x00, // frame control: probe request
+        0x00, 0x00, // duration
+        0xff,0xff,0xff,0xff,0xff,0xff, // DA = broadcast
+        0x11,0x22,0x33,0x44,0x55,0x66, // SA = ваша MAC
+        0xff,0xff,0xff,0xff,0xff,0xff, // BSSID = broadcast
+        0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+		0x00,0x00, // seq ctl
+        // дальше можно SSID IE, etc., но пусть будет пусто
+    };
+
+    // Для простоты будем парсить (канал, wait_ack) из пользовательских данных (необязательно)
+    // а фрейм использовать статически
+    int tx_ch = 6;
+    int wait_ack = 1; // 1=TRUE, 0=FALSE
+    int no_cck = 0;
+    int flags = 0;
+
+    // При желании читаем что прислали user-space
+    // Можем парсить строку - хотя бы канал (tx_ch)
+    if (count > sizeof(tmp))
         return -EFAULT;
+    if (buffer && count) {
+        if (copy_from_user(tmp, buffer, count))
+            return -EFAULT;
+        tmp[count] = '\0';
+
+        // Простейший пример: "echo 13 0 > mgnt_inject" -> tx_ch=13 wait_ack=0
+        // Если не надо – можно не парсить
+        sscanf(tmp, "%d %d", &tx_ch, &wait_ack);
     }
 
-    if (buffer && !copy_from_user(tmp, buffer, count)) {
-        int num = sscanf(tmp, "%hhu %u", &enable, &interval);
-        
-        if (num < 1)
-            return -EINVAL;
-            
-        if (enable) {
-            // Включаем отправку beacon
-            rtw_hal_set_hwreg(padapter, HW_VAR_BCN_VALID, NULL);
-            rtw_hal_set_hwreg(padapter, HW_VAR_DL_BCN_SEL, NULL);
-            
-            // Настройка базовых параметров beacon
-            rtw_write8(padapter, REG_BCN_CTRL, BIT_EN_BCN_FUNCTION | BIT_DIS_TSF_UDT);
-            rtw_write32(padapter, REG_BCN_INTERVAL, interval);
-            
-            // Включаем аппаратный таймер
-            beacon_function_enable(padapter, _TRUE, _TRUE);
-            ResumeTxBeacon(padapter);
-            
-            RTW_INFO("Beacon test started: interval=%d us\n", interval);
-        } else {
-            // Отключаем отправку beacon
-            StopTxBeacon(padapter);
-            RTW_INFO("Beacon test stopped\n");
-        }
+    // Вызываем rtw_mgnt_tx_cmd
+    RTW_INFO("%s: try mgnt_tx_cmd -> channel=%d, wait_ack=%d\n",
+             __func__, tx_ch, wait_ack);
+
+    {
+        // rtw_mgnt_tx_cmd(
+        //    _adapter *adapter,
+        //    u8 tx_ch,
+        //    u8 no_cck,
+        //    const u8 *buf,
+        //    size_t len,
+        //    int wait_ack,
+        //    u8 flags
+        // );
+        u8 tx_ret = rtw_mgnt_tx_cmd(adapter,
+                                    (u8)tx_ch,
+                                    (u8)no_cck,
+                                    test_mgmt,
+                                    sizeof(test_mgmt),
+                                    0,
+                                    (u8)flags);
+
+        if (tx_ret == _SUCCESS)
+            RTW_INFO("%s: mgnt_tx_cmd => _SUCCESS\n", __func__);
+        else
+            RTW_INFO("%s: mgnt_tx_cmd => _FAIL\n", __func__);
     }
 
     return count;
 }
+
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
@@ -6409,9 +6552,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("thermal_state", proc_get_thermal_state, proc_set_thermal_state),
         RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
-		//RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
-		RTW_PROC_HDL_SSEQ("tsf_test", NULL, proc_set_tsf_test),
-		RTW_PROC_HDL_SSEQ{"beacon_test", proc_set_beacon_test, NULL},
+		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
