@@ -6336,15 +6336,8 @@ static ssize_t proc_set_mgnt_inject(
     char tmp[128]; // для приёма строки из user-space
     struct net_device *ndev = data;
     _adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
-	
-//rtw_write8(adapter, REG_FWHW_TXQ_CTRL + 2,
-		//rtw_read8(adapter, REG_FWHW_TXQ_CTRL + 2) | BIT(6));
-	//rtw_write8(adapter, REG_TBTT_PROHIBIT, TBTT_PROHIBIT_SETUP_TIME);
-	ResumeTxBeacon(adapter);
-	//rtw_write8(adapter, REG_TBTT_PROHIBIT + 1, TBTT_PROHIBIT_HOLD_TIME & 0xFF);
-	//rtw_write8(adapter, REG_TBTT_PROHIBIT + 2,
-		//(rtw_read8(adapter, REG_TBTT_PROHIBIT + 2) & 0xF0) | (TBTT_PROHIBIT_HOLD_TIME >> 8));
-	
+
+	//ResumeTxBeacon(adapter);
     rtw_mi_tx_beacon_hdl(adapter);
     tx_beacon_hdl(adapter, NULL);
 
@@ -6544,8 +6537,6 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
     return count;
 }
 
-
-
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
@@ -6555,7 +6546,6 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
-		//RTW_PROC_HDL_SSEQ("send_response", NULL, proc_set_mgnt_send),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
