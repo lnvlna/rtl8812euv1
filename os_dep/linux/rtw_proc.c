@@ -21,7 +21,15 @@
 #include "../../hal/hal_halmac.h"
 #include "../../hal/rtl8822e/rtl8822e.h"
 #include "../../include/rtl8822e_hal.h"
-
+// Инклуды драйвера (относительно корневой директории драйвера)
+#include "../../include/drv_types.h"
+#include "../../include/hal_data.h"
+#include "../../include/rtw_debug.h"
+#include "../../include/rtw_cmd.h"
+#include "../../include/rtw_mlme.h"
+#include "../../include/rtw_mlme_ext.h"
+#include "../../include/rtw_hw.h"
+#include "../../hal/hal_com.h" // для beacon_function_enable и других функций HAL
 // Если определения отсутствуют в заголовочных файлах, добавьте их:
 #ifndef REG_BCN_INTERVAL_8812E
 #define REG_BCN_INTERVAL_8812E    0x0554
@@ -6336,28 +6344,26 @@ static ssize_t proc_set_bf_monitor_en(struct file *file, const char __user *buff
 }
 #endif
 
+//static ssize_t proc_set_mgnt_inject(){}
+
 struct beacon_config {
     u8 enable;
-    u32 interval_us;    // beacon interval в микросекундах
+    u32 interval_us;    // интервал в микросекундах
     u8 dtim_period;     // DTIM период
     u32 tsf_offset;     // смещение TSF
     u8 content[256];    // содержимое beacon frame
     u16 content_len;    // длина содержимого
 };
 
-//static ssize_t proc_set_mgnt_inject(){}
-
-static ssize_t proc_set_tsf_test(struct file *file, const char __user *buffer,
-                                size_t count, loff_t *pos, void *data)
+static ssize_t proc_set_beacon_test(struct file *file, const char __user *buffer,
+                                  size_t count, loff_t *pos, void *data)
 {
     struct net_device *dev = data;
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-    struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
     struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
     char tmp[32];
-    u8 mode, interval;
-    u16 beacon_interval = 100; // мс
-    u32 tsf_h = 0, tsf_l = 0;
+    u8 enable;
+    u32 interval = 100000; // 100ms по умолчанию
     
     if (!buffer || count < 1)
         return -EFAULT;
@@ -6368,45 +6374,29 @@ static ssize_t proc_set_tsf_test(struct file *file, const char __user *buffer,
     }
 
     if (buffer && !copy_from_user(tmp, buffer, count)) {
-        int num = sscanf(tmp, "%hhu %hhu %u %u", &mode, &interval, &tsf_h, &tsf_l);
+        int num = sscanf(tmp, "%hhu %u", &enable, &interval);
         
-        if (num < 2)
+        if (num < 1)
             return -EINVAL;
             
-        if (mode > 2)
-            return -EINVAL;
-
-        // mode: 0 - остановить, 1 - beacon, 2 - probe response
-        switch (mode) {
-        case 0:
-            // Остановка тестирования
-            pmlmeext->tsf_test_enable = 0;
-            RTW_INFO("TSF test stopped\n"); 
-            break;
+        if (enable) {
+            // Включаем отправку beacon
+            rtw_hal_set_hwreg(padapter, HW_VAR_BCN_VALID, NULL);
+            rtw_hal_set_hwreg(padapter, HW_VAR_DL_BCN_SEL, NULL);
             
-        case 1:
-        case 2:
-            // Настройка параметров теста
-            pmlmeext->tsf_test_enable = mode;
-            pmlmeext->tsf_test_interval = interval;
+            // Настройка базовых параметров beacon
+            rtw_write8(padapter, REG_BCN_CTRL, BIT_EN_BCN_FUNCTION | BIT_DIS_TSF_UDT);
+            rtw_write32(padapter, REG_BCN_INTERVAL, interval);
             
-            // Установка TSF если указан
-            if (num == 4) {
-                pmlmeext->TSFValue = ((u64)tsf_h << 32) | tsf_l;
-                rtw_hal_set_hwreg(padapter, HW_VAR_TSF_AUTO_SYNC, NULL);
-            }
+            // Включаем аппаратный таймер
+            beacon_function_enable(padapter, _TRUE, _TRUE);
+            ResumeTxBeacon(padapter);
             
-            // Базовая настройка для отправки beacon/probe response
-            rtw_hal_rcr_set_chk_bssid(padapter, MLME_ACTION_NONE);
-            
-            if (mode == 1) {
-                // Настройка для beacon
-                beacon_function_enable(padapter, _TRUE, _TRUE);
-                RTW_INFO("TSF test started: beacon mode, interval=%d\n", interval);
-            } else {
-                RTW_INFO("TSF test started: probe response mode, interval=%d\n", interval);
-            }
-            break;
+            RTW_INFO("Beacon test started: interval=%d us\n", interval);
+        } else {
+            // Отключаем отправку beacon
+            StopTxBeacon(padapter);
+            RTW_INFO("Beacon test stopped\n");
         }
     }
 
@@ -6422,6 +6412,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 		//RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
 		RTW_PROC_HDL_SSEQ("tsf_test", NULL, proc_set_tsf_test),
+		RTW_PROC_HDL_SSEQ{"beacon_test", proc_set_beacon_test, NULL},
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
