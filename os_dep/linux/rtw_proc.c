@@ -6585,9 +6585,9 @@ static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer
     set_frame_sub_type(pframe, WIFI_BEACON);
 
     // Заполняем адреса
-    _rtw_memcpy(get_addr1_ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+    _rtw_memcpy(GetAddr1Ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
     _rtw_memcpy(get_addr2_ptr(pwlanhdr), adapter_mac_addr(padapter), ETH_ALEN);
-    _rtw_memcpy(get_addr3_ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+    _rtw_memcpy(GetAddr3Ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
 
     // Устанавливаем sequence number
     SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
@@ -6643,7 +6643,6 @@ static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer
     RTW_INFO("Beacon frame sent successfully\n");
     return count;
 }
-
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
