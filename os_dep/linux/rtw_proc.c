@@ -6571,8 +6571,7 @@ static ssize_t proc_set_probe_resp(struct file *file, const char __user *buffer,
 
 
 
-// Добавляем proc entries
-RTW_PROC_HDL_SSEQ("tsf_info", proc_get_tsf_info, proc_set_tsf_ctrl),
+
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
