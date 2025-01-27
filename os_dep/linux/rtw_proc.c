@@ -6544,106 +6544,29 @@ enum _hw_port hwport = HW_PORT0;  // Или другой порт, если тр
     return count;
 }
 
-static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer,
-                                   size_t count, loff_t *pos, void *data)
+static ssize_t proc_set_probe_resp(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
     struct net_device *dev = data;
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
     struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
     struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-    struct xmit_frame *pmgntframe;
-    struct pkt_attrib *pattrib;
-    struct rtw_ieee80211_hdr *pwlanhdr;
-    unsigned char *pframe;
-    u16 *fctrl;
-    
-    // Выделяем xmit_frame для management frame
-    pmgntframe = alloc_mgtxmitframe(&padapter->xmitpriv);
-    if (pmgntframe == NULL) {
-        RTW_INFO("Error: alloc_mgtxmitframe failed\n");
-        return -ENOMEM;
-    }
+    char tmp[32];
+    u8 target_addr[ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // broadcast по умолчанию
 
-    // Получаем указатели на структуры
-    pattrib = &pmgntframe->attrib;
-    pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
-    pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
-
-    // Обнуляем память
-    _rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
-
-    // Заполняем атрибуты
-    update_mgntframe_attrib(padapter, pattrib);
-    pattrib->qsel = QSLT_BEACON;
-    pattrib->rate = MGN_24M; // Используем фиксированную скорость для beacon
-
-    // Заполняем заголовок IEEE 802.11
-    fctrl = &(pwlanhdr->frame_ctl);
-    *(fctrl) = 0;
-
-    // Устанавливаем тип фрейма как beacon
-    set_frame_sub_type(pframe, WIFI_BEACON);
-
-    // Заполняем адреса
-    _rtw_memcpy(GetAddr1Ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
-    _rtw_memcpy(get_addr2_ptr(pwlanhdr), adapter_mac_addr(padapter), ETH_ALEN);
-    _rtw_memcpy(GetAddr3Ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
-
-    // Устанавливаем sequence number
-    SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
-    pmlmeext->mgnt_seq++;
-
-    pframe += sizeof(struct rtw_ieee80211_hdr_3addr);
-    pattrib->pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
-
-    // Добавляем timestamp (8 байт)
-    _rtw_memset(pframe, 0, 8);
-    pframe += 8;
-    pattrib->pktlen += 8;
-
-    // Добавляем beacon interval (2 байта)
-    _rtw_memcpy(pframe, &pmlmeinfo->network.Configuration.BeaconPeriod, 2);
-    pframe += 2;
-    pattrib->pktlen += 2;
-
-    // Добавляем capability info (2 байта)
-    u16 cap_info = 0;
-    _rtw_memcpy(pframe, &cap_info, 2);
-    pframe += 2;
-    pattrib->pktlen += 2;
-
-    // SSID
-    pframe = rtw_set_ie(pframe, _SSID_IE_, pmlmeinfo->network.Ssid.SsidLength,
-                        pmlmeinfo->network.Ssid.Ssid, &(pattrib->pktlen));
-
-    // Supported rates
-    pframe = rtw_set_ie(pframe, _SUPPORTEDRATES_IE_, 8,
-                        pmlmeinfo->network.SupportedRates, &(pattrib->pktlen));
-
-    // DS Parameter Set
-    pframe = rtw_set_ie(pframe, _DSSET_IE_, 1,
-                        &(pmlmeext->cur_channel), &(pattrib->pktlen));
-
-    // TIM
-    u8 tim_ie[7] = {0};
-    tim_ie[0] = 0; // DTIM count
-    tim_ie[1] = 1; // DTIM period
-    tim_ie[2] = 0; // Bitmap control
-    tim_ie[3] = 0; // Bitmap
-    pframe = rtw_set_ie(pframe, _TIM_IE_, 6, tim_ie, &(pattrib->pktlen));
-
-    pattrib->last_txcmdsz = pattrib->pktlen;
-
-    // Отправляем фрейм
-    if (dump_mgntframe(padapter, pmgntframe) != _SUCCESS) {
-        RTW_INFO("dump_mgntframe failed\n");
+    if (count > sizeof(tmp)) {
+        RTW_INFO("buffer size is too large\n");
         return -EFAULT;
     }
 
-    RTW_INFO("Beacon frame sent successfully\n");
+    if (buffer && !copy_from_user(tmp, buffer, count)) {
+        // Можно добавить парсинг MAC-адреса получателя из tmp если нужно
+    }
+
+    issue_probersp(padapter, target_addr, _FALSE);
+    RTW_INFO("Probe Response отправлен\n");
+
     return count;
 }
-
 
 
 
@@ -6659,8 +6582,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
-		RTW_PROC_HDL_SSEQ("send_beacon", NULL, proc_set_send_beacon),
-		RTW_PROC_HDL_SSEQ("tsf_monitor", proc_get_tsf_monitor, proc_set_tsf_monitor),
+		RTW_PROC_HDL_SSEQ("send_beacon", NULL, proc_set_probe_resp),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
