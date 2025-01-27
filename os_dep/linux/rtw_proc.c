@@ -6345,7 +6345,7 @@ struct beacon_config {
     u16 content_len;    // длина содержимого
 };
 
-static ssize_t proc_set_mgnt_inject(){}
+//static ssize_t proc_set_mgnt_inject(){}
 
 static ssize_t proc_set_tsf_test(struct file *file, const char __user *buffer,
                                 size_t count, loff_t *pos, void *data)
