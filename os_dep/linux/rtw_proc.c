@@ -6645,65 +6645,110 @@ static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer
 }
 
 
-struct tsf_monitor {
-    _adapter *padapter;
-    struct timer_list timer;
-    bool active;
-    u64 last_tsf;
-    u32 interval_ms;
-    u8 port;  // Добавляем порт для мониторинга
+
+// Определяем возможные режимы TSF
+enum rtw_tsf_mode {
+    RTW_TSF_OFF = 0,
+    RTW_TSF_ON_AP = 1,      // AP режим
+    RTW_TSF_ON_ADHOC = 2,   // ADHOC режим
+    RTW_TSF_ON_MESH = 3,    // MESH режим
+    RTW_TSF_ON_MONITOR = 4  // Monitor режим
 };
 
-static struct tsf_monitor *tsf_data = NULL;
-
-// Функция-обработчик таймера
-static void tsf_monitor_handler(struct timer_list *t)
+static int proc_get_tsf_info(struct seq_file *m, void *v)
 {
-    struct tsf_monitor *data = from_timer(data, t, timer);
-    _adapter *padapter = data->padapter;
-    u64 current_tsf;
-    u64 tsf_diff;
+    struct net_device *dev = m->private;
+    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+    struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+    struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+    HAL_DATA_TYPE *hal_data = GET_HAL_DATA(padapter);
     
-    if (!data->active)
-        return;
+    // Проверяем включен ли TSF
+    u8 tsf_ctrl = rtw_read8(padapter, REG_BCN_CTRL);
+    bool tsf_enabled = !(tsf_ctrl & BIT_DIS_TSF_UDT);
+    
+    seq_printf(m, "=== TSF Information ===\n");
+    seq_printf(m, "TSF Status: %s\n", tsf_enabled ? "Enabled" : "Disabled");
+    
+    if (tsf_enabled) {
+        // Определяем режим работы
+        enum rtw_tsf_mode tsf_mode;
+        if (check_fwstate(&padapter->mlmepriv, WIFI_AP_STATE))
+            tsf_mode = RTW_TSF_ON_AP;
+        else if (check_fwstate(&padapter->mlmepriv, WIFI_ADHOC_STATE))
+            tsf_mode = RTW_TSF_ON_ADHOC;
+        else if (check_fwstate(&padapter->mlmepriv, WIFI_MESH_STATE))
+            tsf_mode = RTW_TSF_ON_MESH;
+        else if (check_fwstate(&padapter->mlmepriv, WIFI_MONITOR_STATE))
+            tsf_mode = RTW_TSF_ON_MONITOR;
+        else
+            tsf_mode = RTW_TSF_OFF;
 
-    // Читаем текущее значение TSF из регистров для конкретного порта
-    current_tsf = rtw_hal_get_tsftr_by_port(padapter, data->port);
-    
-    // Вычисляем разницу с предыдущим значением
-    if (data->last_tsf != 0) {
-        tsf_diff = current_tsf - data->last_tsf;
-        RTW_INFO("Port %d TSF: %llu (diff: %llu us)\n", 
-                 data->port, current_tsf, tsf_diff);
-    } else {
-        RTW_INFO("Port %d TSF: %llu\n", data->port, current_tsf);
+        seq_printf(m, "TSF Mode: ");
+        switch (tsf_mode) {
+            case RTW_TSF_ON_AP:
+                seq_printf(m, "AP Mode\n");
+                break;
+            case RTW_TSF_ON_ADHOC:
+                seq_printf(m, "ADHOC Mode\n");
+                break;
+            case RTW_TSF_ON_MESH:
+                seq_printf(m, "MESH Mode\n");
+                break;
+            case RTW_TSF_ON_MONITOR:
+                seq_printf(m, "Monitor Mode\n");
+                break;
+            default:
+                seq_printf(m, "Unknown/Off\n");
+                break;
+        }
+
+        // Читаем текущие значения TSF для всех портов
+        int i;
+        for (i = 0; i < padapter->iface_num; i++) {
+            u64 tsf = rtw_hal_get_tsftr_by_port(padapter, i);
+            seq_printf(m, "Port %d TSF: %llu\n", i, tsf);
+            
+            // Дополнительная информация о регистрах
+            u32 tsf_low = rtw_read32(padapter, REG_TSFTR + (i * 8));
+            u32 tsf_high = rtw_read32(padapter, REG_TSFTR + 4 + (i * 8));
+            seq_printf(m, "Port %d TSF Registers - Low: 0x%08x High: 0x%08x\n", 
+                      i, tsf_low, tsf_high);
+        }
+
+        // Проверяем настройки TSF
+        u8 bcn_ctrl = rtw_read8(padapter, REG_BCN_CTRL);
+        seq_printf(m, "\nTSF Control Settings:\n");
+        seq_printf(m, "TSF Update: %s\n", 
+                  (bcn_ctrl & BIT_DIS_TSF_UDT) ? "Disabled" : "Enabled");
+        seq_printf(m, "BCNDMATIM Enable: %s\n", 
+                  (bcn_ctrl & BIT_BCNDMATIM_EN) ? "Yes" : "No");
+        seq_printf(m, "Early ATIM: %s\n", 
+                  (bcn_ctrl & BIT_EARLY_ATIM) ? "Enabled" : "Disabled");
+        
+        // Информация о синхронизации
+        if (tsf_mode != RTW_TSF_OFF) {
+            seq_printf(m, "\nSynchronization Info:\n");
+            if (pmlmeinfo->state == WIFI_FW_STATION_STATE) {
+                seq_printf(m, "Connected to BSSID: "MAC_FMT"\n", 
+                          MAC_ARG(pmlmeinfo->network.MacAddress));
+                seq_printf(m, "Beacon Interval: %d TU\n", 
+                          pmlmeinfo->bcn_interval);
+            }
+        }
     }
-    
-    data->last_tsf = current_tsf;
 
-    // Выводим значения регистров TSF для конкретного порта
-    u32 tsf_low = rtw_read32(padapter, REG_TSFTR + (data->port * 8));
-    u32 tsf_high = rtw_read32(padapter, REG_TSFTR + 4 + (data->port * 8));
-    
-    RTW_INFO("Port %d TSF Registers - Low: 0x%08x High: 0x%08x\n", 
-             data->port, tsf_low, tsf_high);
-
-    // Перезапускаем таймер
-    if (data->active) {
-        mod_timer(&data->timer, jiffies + msecs_to_jiffies(data->interval_ms));
-    }
+    return 0;
 }
 
-// Функция для запуска мониторинга TSF
-static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer,
-                                  size_t count, loff_t *pos, void *data)
+// Функция для управления TSF
+static ssize_t proc_set_tsf_ctrl(struct file *file, const char __user *buffer,
+                               size_t count, loff_t *pos, void *data)
 {
     struct net_device *dev = data;
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
     char tmp[32];
-    u32 interval_ms = 1000; // По умолчанию 1 секунда
-    u8 port = HW_PORT0;     // По умолчанию порт 0
-    u8 start_val = 0;
+    u8 tsf_ctrl;
 
     if (count < 1)
         return -EFAULT;
@@ -6714,49 +6759,19 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
     }
 
     if (buffer && !copy_from_user(tmp, buffer, count)) {
-        // Парсим входные данные
-        // Формат: "<1|0> [interval_ms] [port]"
-        // Пример: "1 100 0" - запустить с интервалом 100мс для порта 0
-        //         "0" - остановить
-        int num = sscanf(tmp, "%hhu %u %hhu", &start_val, &interval_ms, &port);
+        int num = sscanf(tmp, "%hhu", &tsf_ctrl);
         
-        if (num >= 1) {
-            if (start_val) {
-                if (tsf_data == NULL) {
-                    // Создаем новый монитор
-                    tsf_data = rtw_malloc(sizeof(struct tsf_monitor));
-                    if (!tsf_data)
-                        return -ENOMEM;
-
-                    tsf_data->padapter = padapter;
-                    tsf_data->active = true;
-                    tsf_data->last_tsf = 0;
-                    tsf_data->interval_ms = interval_ms;
-                    tsf_data->port = port;
-
-                    // Инициализация таймера
-                    timer_setup(&tsf_data->timer, tsf_monitor_handler, 0);
-                    mod_timer(&tsf_data->timer, 
-                             jiffies + msecs_to_jiffies(tsf_data->interval_ms));
-                    
-                    RTW_INFO("TSF monitor started for port %d with interval %ums\n", 
-                            port, interval_ms);
-                } else {
-                    // Обновляем параметры если монитор уже запущен
-                    tsf_data->interval_ms = interval_ms;
-                    tsf_data->port = port;
-                    RTW_INFO("TSF monitor updated: port %d, interval %ums\n", 
-                            port, interval_ms);
-                }
+        if (num == 1) {
+            if (tsf_ctrl) {
+                // Включаем TSF
+                rtw_write8(padapter, REG_BCN_CTRL, 
+                          rtw_read8(padapter, REG_BCN_CTRL) & (~BIT_DIS_TSF_UDT));
+                RTW_INFO("TSF enabled\n");
             } else {
-                // Останавливаем монитор
-                if (tsf_data) {
-                    tsf_data->active = false;
-                    del_timer_sync(&tsf_data->timer);
-                    rtw_mfree(tsf_data, sizeof(struct tsf_monitor));
-                    tsf_data = NULL;
-                    RTW_INFO("TSF monitor stopped\n");
-                }
+                // Выключаем TSF
+                rtw_write8(padapter, REG_BCN_CTRL, 
+                          rtw_read8(padapter, REG_BCN_CTRL) | BIT_DIS_TSF_UDT);
+                RTW_INFO("TSF disabled\n");
             }
             return count;
         }
@@ -6764,31 +6779,8 @@ static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer
     return -EFAULT;
 }
 
-// Функция для чтения текущего состояния монитора TSF
-static int proc_get_tsf_monitor(struct seq_file *m, void *v)
-{
-    struct net_device *dev = m->private;
-    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-    
-    if (tsf_data && tsf_data->active) {
-        u64 current_tsf = rtw_hal_get_tsftr_by_port(padapter, tsf_data->port);
-        
-        seq_printf(m, "TSF Monitor Status:\n");
-        seq_printf(m, "Active: Yes\n");
-        seq_printf(m, "Port: %d\n", tsf_data->port);
-        seq_printf(m, "Interval: %u ms\n", tsf_data->interval_ms);
-        seq_printf(m, "Current TSF: %llu\n", current_tsf);
-        seq_printf(m, "Last TSF: %llu\n", tsf_data->last_tsf);
-        if (tsf_data->last_tsf != 0) {
-            seq_printf(m, "Difference: %llu us\n", 
-                      current_tsf - tsf_data->last_tsf);
-        }
-    } else {
-        seq_printf(m, "TSF Monitor Status: Inactive\n");
-    }
-    
-    return 0;
-}
+// Добавляем proc entries
+RTW_PROC_HDL_SSEQ("tsf_info", proc_get_tsf_info, proc_set_tsf_ctrl),
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
