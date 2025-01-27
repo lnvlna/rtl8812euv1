@@ -6345,16 +6345,21 @@ struct beacon_config {
     u16 content_len;    // длина содержимого
 };
 
-static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer,
-                                   size_t count, loff_t *pos, void *data)
+static ssize_t proc_set_mgnt_inject(){}
+
+static ssize_t proc_set_tsf_test(struct file *file, const char __user *buffer,
+                                size_t count, loff_t *pos, void *data)
 {
     struct net_device *dev = data;
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+    struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
+    struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
     char tmp[32];
-    u8 enable, val8, orig_val8;
-    int ret = 0;
-
-    if (count < 1)
+    u8 mode, interval;
+    u16 beacon_interval = 100; // мс
+    u32 tsf_h = 0, tsf_l = 0;
+    
+    if (!buffer || count < 1)
         return -EFAULT;
 
     if (count > sizeof(tmp)) {
@@ -6363,99 +6368,45 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
     }
 
     if (buffer && !copy_from_user(tmp, buffer, count)) {
-        if (sscanf(tmp, "%hhu", &enable) != 1)
+        int num = sscanf(tmp, "%hhu %hhu %u %u", &mode, &interval, &tsf_h, &tsf_l);
+        
+        if (num < 2)
+            return -EINVAL;
+            
+        if (mode > 2)
             return -EINVAL;
 
-        if (enable) {
-            // Базовый beacon frame
-            u8 beacon_frame[] = {
-                /* MAC Header */
-                0x80, 0x00,                         // Frame Control (Beacon)
-                0x00, 0x00,                         // Duration
-                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // DA (broadcast)
-                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, // SA 
-                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, // BSSID
-                0x00, 0x00,                         // Sequence Control
-                
-                /* Beacon body */
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Timestamp
-                0x64, 0x00,                         // Beacon Interval (100ms)
-                0x01, 0x00,                         // Capability (ESS)
-                0x00, 0x00,                         // SSID (пустой)
-            };
-
-            // 1. Сохраняем текущее состояние
-            orig_val8 = rtw_read8(padapter, REG_BCN_CTRL);
-            pr_info("Original BCN_CTRL: 0x%02x\n", orig_val8);
-
-            // 2. Отключаем все функции beacon
-            ret = rtw_write8(padapter, REG_BCN_CTRL, 0x00);
-            if (ret != _SUCCESS) {
-                pr_err("Failed to disable beacon functions\n");
-                return count;
+        // mode: 0 - остановить, 1 - beacon, 2 - probe response
+        switch (mode) {
+        case 0:
+            // Остановка тестирования
+            pmlmeext->tsf_test_enable = 0;
+            RTW_INFO("TSF test stopped\n"); 
+            break;
+            
+        case 1:
+        case 2:
+            // Настройка параметров теста
+            pmlmeext->tsf_test_enable = mode;
+            pmlmeext->tsf_test_interval = interval;
+            
+            // Установка TSF если указан
+            if (num == 4) {
+                pmlmeext->TSFValue = ((u64)tsf_h << 32) | tsf_l;
+                rtw_hal_set_hwreg(padapter, HW_VAR_TSF_AUTO_SYNC, NULL);
             }
-            pr_info("Beacon functions disabled\n");
-
-            // Проверяем, что запись прошла успешно
-            val8 = rtw_read8(padapter, REG_BCN_CTRL);
-            if (val8 != 0x00) {
-                pr_err("BCN_CTRL write verification failed: 0x%02x\n", val8);
-                goto restore;
+            
+            // Базовая настройка для отправки beacon/probe response
+            rtw_hal_rcr_set_chk_bssid(padapter, MLME_ACTION_NONE);
+            
+            if (mode == 1) {
+                // Настройка для beacon
+                beacon_function_enable(padapter, _TRUE, _TRUE);
+                RTW_INFO("TSF test started: beacon mode, interval=%d\n", interval);
+            } else {
+                RTW_INFO("TSF test started: probe response mode, interval=%d\n", interval);
             }
-
-            // 3. Настраиваем FIFO
-            ret = rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, 0x80);
-            pr_info("FIFO page set: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
-            if (ret != _SUCCESS) {
-                goto restore;
-            }
-
-            // 4. Загружаем beacon frame
-            rtw_hal_fill_fake_txdesc(padapter, beacon_frame, 
-                                   sizeof(beacon_frame),
-                                   _TRUE, _FALSE, _TRUE);
-            pr_info("Beacon frame loaded\n");
-
-            // 5. Устанавливаем интервал (100ms)
-            ret = rtw_write16(padapter, REG_BCN_INTERVAL_8812E, 100);
-            pr_info("Beacon interval set: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
-            if (ret != _SUCCESS) {
-                goto restore;
-            }
-
-            // 6. Включаем только необходимые биты
-            val8 = BIT_EN_BCN_FUNCTION;  // Сначала только функцию beacon
-            ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
-            pr_info("Basic beacon function enabled: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
-            if (ret != _SUCCESS) {
-                goto restore;
-            }
-
-            // Небольшая задержка
-            msleep(1);
-
-            // Добавляем бит отчета
-            val8 |= BIT_P0_EN_TXBCN_RPT;
-            ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
-            pr_info("Beacon report enabled: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
-
-            // Ждем отправки (используем msleep вместо mdelay)
-            msleep(2);
-
-restore:
-            // 7. Восстанавливаем настройки
-            pr_info("Restoring original settings...\n");
-            ret = rtw_write8(padapter, REG_BCN_CTRL, 0x00);
-            msleep(1);
-            ret = rtw_write8(padapter, REG_BCN_CTRL, orig_val8);
-            pr_info("Original settings restored\n");
-
-        } else {
-            // Отключаем все функции beacon
-            val8 = rtw_read8(padapter, REG_BCN_CTRL);
-            val8 &= ~(BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT);
-            ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
-            pr_info("Beacon functions disabled\n");
+            break;
         }
     }
 
@@ -6470,6 +6421,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
+		RTW_PROC_HDL_SSEQ("tsf_test", NULL, proc_set_tsf_test),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
