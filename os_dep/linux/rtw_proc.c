@@ -6581,14 +6581,17 @@ static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer
     fctrl = &(pwlanhdr->frame_ctl);
     *(fctrl) = 0;
 
-    SetFrameSubType(pframe, WIFI_BEACON);
+    // Устанавливаем тип фрейма как beacon
+    set_frame_sub_type(pframe, WIFI_BEACON);
 
-    _rtw_memcpy(GetAddr1Ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
-    _rtw_memcpy(GetAddr2Ptr(pwlanhdr), adapter_mac_addr(padapter), ETH_ALEN);
-    _rtw_memcpy(GetAddr3Ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+    // Заполняем адреса
+    _rtw_memcpy(get_addr1_ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+    _rtw_memcpy(get_addr2_ptr(pwlanhdr), adapter_mac_addr(padapter), ETH_ALEN);
+    _rtw_memcpy(get_addr3_ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
 
     // Устанавливаем sequence number
-    SetSeqNum(pwlanhdr, 0);
+    SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
+    pmlmeext->mgnt_seq++;
 
     pframe += sizeof(struct rtw_ieee80211_hdr_3addr);
     pattrib->pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
