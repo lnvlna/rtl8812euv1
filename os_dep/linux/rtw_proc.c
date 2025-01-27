@@ -6551,68 +6551,93 @@ static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer
     _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
     struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
     struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-    WLAN_BSSID_EX *pnetwork = &(pmlmeinfo->network);
-    unsigned char *pbuf;
-    u32 len;
+    struct xmit_frame *pmgntframe;
+    struct pkt_attrib *pattrib;
+    struct rtw_ieee80211_hdr *pwlanhdr;
+    unsigned char *pframe;
+    u16 *fctrl;
     
-    // Выделяем память под beacon фрейм
-    pbuf = rtw_zmalloc(MAX_BEACON_LEN);
-    if (!pbuf)
+    // Выделяем xmit_frame для management frame
+    pmgntframe = alloc_mgtxmitframe(&padapter->xmitpriv);
+    if (pmgntframe == NULL) {
+        RTW_INFO("Error: alloc_mgtxmitframe failed\n");
         return -ENOMEM;
+    }
 
-    // Формируем заголовок beacon фрейма
-    len = 0;
-    pbuf[0] = WIFI_BEACON;
-    pbuf[1] = 0;
-    len = 2;
+    // Получаем указатели на структуры
+    pattrib = &pmgntframe->attrib;
+    pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
+    pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+
+    // Обнуляем память
+    _rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+
+    // Заполняем атрибуты
+    update_mgntframe_attrib(padapter, pattrib);
+    pattrib->qsel = QSLT_BEACON;
+    pattrib->rate = MGN_24M; // Используем фиксированную скорость для beacon
+
+    // Заполняем заголовок IEEE 802.11
+    fctrl = &(pwlanhdr->frame_ctl);
+    *(fctrl) = 0;
+
+    SetFrameSubType(pframe, WIFI_BEACON);
+
+    _rtw_memcpy(GetAddr1Ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+    _rtw_memcpy(GetAddr2Ptr(pwlanhdr), adapter_mac_addr(padapter), ETH_ALEN);
+    _rtw_memcpy(GetAddr3Ptr(pwlanhdr), get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+
+    // Устанавливаем sequence number
+    SetSeqNum(pwlanhdr, 0);
+
+    pframe += sizeof(struct rtw_ieee80211_hdr_3addr);
+    pattrib->pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
 
     // Добавляем timestamp (8 байт)
-    _rtw_memset(pbuf + len, 0, 8);
-    len += 8;
+    _rtw_memset(pframe, 0, 8);
+    pframe += 8;
+    pattrib->pktlen += 8;
 
     // Добавляем beacon interval (2 байта)
-    _rtw_memcpy(pbuf + len, &pmlmeinfo->network.Configuration.BeaconPeriod, 2);
-    len += 2;
+    _rtw_memcpy(pframe, &pmlmeinfo->network.Configuration.BeaconPeriod, 2);
+    pframe += 2;
+    pattrib->pktlen += 2;
 
     // Добавляем capability info (2 байта)
-    _rtw_memcpy(pbuf + len, &pmlmeinfo->network.Capability, 2); 
-    len += 2;
+    u16 cap_info = 0;
+    _rtw_memcpy(pframe, &cap_info, 2);
+    pframe += 2;
+    pattrib->pktlen += 2;
 
     // SSID
-    pbuf[len++] = _SSID_IE_;
-    pbuf[len++] = pmlmeinfo->network.Ssid.SsidLength;
-    _rtw_memcpy(pbuf + len, pmlmeinfo->network.Ssid.Ssid, pmlmeinfo->network.Ssid.SsidLength);
-    len += pmlmeinfo->network.Ssid.SsidLength;
+    pframe = rtw_set_ie(pframe, _SSID_IE_, pmlmeinfo->network.Ssid.SsidLength,
+                        pmlmeinfo->network.Ssid.Ssid, &(pattrib->pktlen));
 
     // Supported rates
-    pbuf[len++] = _SUPPORTEDRATES_IE_;
-    pbuf[len++] = 8;
-    _rtw_memcpy(pbuf + len, pmlmeinfo->network.SupportedRates, 8);
-    len += 8;
+    pframe = rtw_set_ie(pframe, _SUPPORTEDRATES_IE_, 8,
+                        pmlmeinfo->network.SupportedRates, &(pattrib->pktlen));
 
     // DS Parameter Set
-    pbuf[len++] = _DSSET_IE_;
-    pbuf[len++] = 1;
-    pbuf[len++] = pmlmeext->cur_channel;
+    pframe = rtw_set_ie(pframe, _DSSET_IE_, 1,
+                        &(pmlmeext->cur_channel), &(pattrib->pktlen));
 
     // TIM
-    pbuf[len++] = _TIM_IE_;
-    pbuf[len++] = 4;
-    pbuf[len++] = 0; // DTIM count
-    pbuf[len++] = 1; // DTIM period
-    pbuf[len++] = 0; // Bitmap control 
-    pbuf[len++] = 0; // Bitmap
+    u8 tim_ie[7] = {0};
+    tim_ie[0] = 0; // DTIM count
+    tim_ie[1] = 1; // DTIM period
+    tim_ie[2] = 0; // Bitmap control
+    tim_ie[3] = 0; // Bitmap
+    pframe = rtw_set_ie(pframe, _TIM_IE_, 6, tim_ie, &(pattrib->pktlen));
 
-    RTW_INFO("Sending beacon frame, len=%d\n", len);
+    pattrib->last_txcmdsz = pattrib->pktlen;
 
-    // Отправляем beacon через HAL
-    if (rtw_hal_mgnt_xmit(padapter, pbuf, len) == _FAIL) {
-        RTW_INFO("Beacon send failed!\n");
-        rtw_mfree(pbuf, MAX_BEACON_LEN);
+    // Отправляем фрейм
+    if (dump_mgntframe(padapter, pmgntframe) != _SUCCESS) {
+        RTW_INFO("dump_mgntframe failed\n");
         return -EFAULT;
     }
 
-    rtw_mfree(pbuf, MAX_BEACON_LEN);
+    RTW_INFO("Beacon frame sent successfully\n");
     return count;
 }
 
