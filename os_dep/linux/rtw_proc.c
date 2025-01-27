@@ -19,8 +19,8 @@
 #include "rtw_proc.h"
 #include <rtw_btcoex.h>
 #include "../../hal/hal_halmac.h"
-#include <hal_data.h>
-#include <rtl8812e_hal.h>
+#include "../../hal/rtl8822e/rtl8822e.h"
+#include "../../hal/rtl8822e_hal.h"
 
 // Если определения отсутствуют в заголовочных файлах, добавьте их:
 #ifndef REG_BCN_INTERVAL_8812E
