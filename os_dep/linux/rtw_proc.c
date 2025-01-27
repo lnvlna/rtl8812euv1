@@ -6339,7 +6339,7 @@ static ssize_t proc_set_mgnt_inject(
 
 	ResumeTxBeacon(adapter);
     rtw_mi_tx_beacon_hdl(adapter);
-    tx_beacon_hdl(adapter, NULL);
+    //tx_beacon_hdl(adapter, NULL);
 
 
 
