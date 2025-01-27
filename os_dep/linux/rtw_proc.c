@@ -6643,6 +6643,142 @@ static ssize_t proc_set_send_beacon(struct file *file, const char __user *buffer
     RTW_INFO("Beacon frame sent successfully\n");
     return count;
 }
+
+struct tsf_monitor {
+    _adapter *padapter;
+    struct timer_list timer;
+    bool active;
+    u64 last_tsf;
+    u32 interval_ms;
+};
+
+static struct tsf_monitor *tsf_data = NULL;
+
+// Функция-обработчик таймера
+static void tsf_monitor_handler(struct timer_list *t)
+{
+    struct tsf_monitor *data = from_timer(data, t, timer);
+    _adapter *padapter = data->padapter;
+    u64 current_tsf;
+    u64 tsf_diff;
+    
+    if (!data->active)
+        return;
+
+    // Читаем текущее значение TSF из регистров
+    current_tsf = rtw_hal_get_tsf(padapter);
+    
+    // Вычисляем разницу с предыдущим значением
+    if (data->last_tsf != 0) {
+        tsf_diff = current_tsf - data->last_tsf;
+        RTW_INFO("TSF: %llu (diff: %llu us)\n", current_tsf, tsf_diff);
+    } else {
+        RTW_INFO("TSF: %llu\n", current_tsf);
+    }
+    
+    data->last_tsf = current_tsf;
+
+    // Также можно вывести значения отдельных регистров TSF
+    u32 tsf_low = rtw_read32(padapter, REG_TSFTR);
+    u32 tsf_high = rtw_read32(padapter, REG_TSFTR + 4);
+    
+    RTW_INFO("TSF Registers - Low: 0x%08x High: 0x%08x\n", tsf_low, tsf_high);
+
+    // Перезапускаем таймер
+    if (data->active) {
+        mod_timer(&data->timer, jiffies + msecs_to_jiffies(data->interval_ms));
+    }
+}
+
+// Функция для запуска мониторинга TSF
+static ssize_t proc_set_tsf_monitor(struct file *file, const char __user *buffer,
+                                  size_t count, loff_t *pos, void *data)
+{
+    struct net_device *dev = data;
+    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+    char tmp[32];
+    u32 interval_ms = 1000; // По умолчанию 1 секунда
+    bool start = false;
+
+    if (count < 1)
+        return -EFAULT;
+
+    if (count > sizeof(tmp)) {
+        rtw_warn_on(1);
+        return -EFAULT;
+    }
+
+    if (buffer && !copy_from_user(tmp, buffer, count)) {
+        // Парсим входные данные
+        // Формат: "<1|0> [interval_ms]"
+        // Пример: "1 100" - запустить с интервалом 100мс
+        //         "0" - остановить
+        int num = sscanf(tmp, "%hhu %u", &start, &interval_ms);
+        
+        if (num >= 1) {
+            if (start) {
+                if (tsf_data == NULL) {
+                    // Создаем новый монитор
+                    tsf_data = rtw_malloc(sizeof(struct tsf_monitor));
+                    if (!tsf_data)
+                        return -ENOMEM;
+
+                    tsf_data->padapter = padapter;
+                    tsf_data->active = true;
+                    tsf_data->last_tsf = 0;
+                    tsf_data->interval_ms = interval_ms;
+
+                    // Инициализация таймера
+                    timer_setup(&tsf_data->timer, tsf_monitor_handler, 0);
+                    mod_timer(&tsf_data->timer, 
+                             jiffies + msecs_to_jiffies(tsf_data->interval_ms));
+                    
+                    RTW_INFO("TSF monitor started with interval %ums\n", interval_ms);
+                } else {
+                    // Обновляем интервал если монитор уже запущен
+                    tsf_data->interval_ms = interval_ms;
+                    RTW_INFO("TSF monitor interval updated to %ums\n", interval_ms);
+                }
+            } else {
+                // Останавливаем монитор
+                if (tsf_data) {
+                    tsf_data->active = false;
+                    del_timer_sync(&tsf_data->timer);
+                    rtw_mfree(tsf_data, sizeof(struct tsf_monitor));
+                    tsf_data = NULL;
+                    RTW_INFO("TSF monitor stopped\n");
+                }
+            }
+            return count;
+        }
+    }
+    return -EFAULT;
+}
+
+// Функция для чтения текущего состояния монитора TSF
+static int proc_get_tsf_monitor(struct seq_file *m, void *v)
+{
+    struct net_device *dev = m->private;
+    _adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+    
+    if (tsf_data && tsf_data->active) {
+        u64 current_tsf = rtw_hal_get_tsf(padapter);
+        
+        seq_printf(m, "TSF Monitor Status:\n");
+        seq_printf(m, "Active: Yes\n");
+        seq_printf(m, "Interval: %u ms\n", tsf_data->interval_ms);
+        seq_printf(m, "Current TSF: %llu\n", current_tsf);
+        seq_printf(m, "Last TSF: %llu\n", tsf_data->last_tsf);
+        if (tsf_data->last_tsf != 0) {
+            seq_printf(m, "Difference: %llu us\n", 
+                      current_tsf - tsf_data->last_tsf);
+        }
+    } else {
+        seq_printf(m, "TSF Monitor Status: Inactive\n");
+    }
+    
+    return 0;
+}
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
@@ -6653,6 +6789,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
         RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 		RTW_PROC_HDL_SSEQ("mgnt_inject", NULL, proc_set_mgnt_inject),
 		RTW_PROC_HDL_SSEQ("send_beacon", NULL, proc_set_send_beacon),
+		RTW_PROC_HDL_SSEQ("tsf_monitor", proc_get_tsf_monitor, proc_set_tsf_monitor),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
