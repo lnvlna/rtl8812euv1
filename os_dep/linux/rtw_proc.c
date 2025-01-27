@@ -6354,6 +6354,7 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
     u8 enable, val8;
     u16 val16;
     int ret = 0;
+    int i;  // Объявляем i в начале функции для C89 совместимости
 
     if (count < 1)
         return -EFAULT;
@@ -6400,7 +6401,7 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
 
             // Тестируем разные значения TBTT
             u8 tbtt_values[] = {0x04, 0x08, 0x0c, 0x10};
-            for (int i = 0; i < sizeof(tbtt_values); i++) {
+            for (i = 0; i < sizeof(tbtt_values); i++) {
                 ret = rtw_write8(padapter, REG_TBTT_PROHIBIT, tbtt_values[i]);
                 pr_info("Set TBTT_PROHIBIT to 0x%02x: %s\n", 
                        tbtt_values[i], ret == _SUCCESS ? "OK" : "FAIL");
@@ -6409,21 +6410,21 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
             // 4. Настройка FIFO и DMA
             // Пробуем разные значения head page
             u16 head_pages[] = {0x80, 0x90, 0xa0};
-            for (int i = 0; i < sizeof(head_pages)/sizeof(head_pages[0]); i++) {
+            for (i = 0; i < sizeof(head_pages)/sizeof(head_pages[0]); i++) {
                 ret = rtw_write16(padapter, REG_FIFOPAGE_CTRL_2, head_pages[i]);
                 pr_info("Set FIFO head page to 0x%04x: %s\n", 
                        head_pages[i], ret == _SUCCESS ? "OK" : "FAIL");
             }
 
             // 5. Загрузка beacon frame
-            ret = rtw_hal_fill_fake_txdesc(padapter, beacon_frame, 
-                                         sizeof(beacon_frame),
-                                         _TRUE, _FALSE, _TRUE);
-            pr_info("Load beacon frame: %s\n", ret == _SUCCESS ? "OK" : "FAIL");
+            rtw_hal_fill_fake_txdesc(padapter, beacon_frame, 
+                                   sizeof(beacon_frame),
+                                   _TRUE, _FALSE, _TRUE);
+            pr_info("Load beacon frame completed\n");
 
             // 6. Тестируем разные интервалы beacon
             u16 intervals[] = {50, 100, 200};
-            for (int i = 0; i < sizeof(intervals)/sizeof(intervals[0]); i++) {
+            for (i = 0; i < sizeof(intervals)/sizeof(intervals[0]); i++) {
                 ret = rtw_write16(padapter, REG_BCN_INTERVAL_8812E, intervals[i]);
                 pr_info("Set beacon interval to %dms: %s\n", 
                        intervals[i], ret == _SUCCESS ? "OK" : "FAIL");
@@ -6436,7 +6437,7 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
                 BIT_EN_BCN_FUNCTION | BIT_P0_EN_TXBCN_RPT | BIT_DIS_TSF_UDT
             };
 
-            for (int i = 0; i < sizeof(bcn_ctrl_combinations)/sizeof(bcn_ctrl_combinations[0]); i++) {
+            for (i = 0; i < sizeof(bcn_ctrl_combinations)/sizeof(bcn_ctrl_combinations[0]); i++) {
                 val8 = rtw_read8(padapter, REG_BCN_CTRL);
                 val8 |= bcn_ctrl_combinations[i];
                 ret = rtw_write8(padapter, REG_BCN_CTRL, val8);
@@ -6448,7 +6449,7 @@ static ssize_t proc_set_mgnt_inject(struct file *file, const char __user *buffer
                 pr_info("Verified BCN_CTRL value: 0x%02x\n", read_val);
                 
                 // Небольшая задержка между комбинациями
-                rtw_mdelay(100);
+                rtw_mdelay_os(100);
             }
 
             pr_info("Beacon injection test completed\n");
